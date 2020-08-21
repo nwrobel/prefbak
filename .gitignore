@@ -1,2 +1,4 @@
 backupsToAdd.txt
 machine-config/*
+.vscode
+py-venv
