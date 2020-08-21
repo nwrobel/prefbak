@@ -1,4 +1,4 @@
 backupsToAdd.txt
-zinc.config.json
+machine-config/*
 .vscode
 py-venv
