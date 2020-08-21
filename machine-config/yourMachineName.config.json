@@ -1,0 +1,15 @@
+[
+    {
+        "sourcePath": "/home/user/some-file",
+        "backupPath": "destDir/some-file",
+        "compress": "no"
+    },
+    {
+        "sourcePath": "/home/user/some-folder",
+        "backupPath": "destDir/some-folder",
+        "compress": "yes"
+    }
+]
+
+
+
