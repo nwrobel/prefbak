@@ -1,5 +1,10 @@
 {
     "backupRootDir":"/machine/backups/root/dir",
+    "backupDataPermissions": {
+        "owner": "tommy",
+        "group": "tommy",
+        "mask": "700"
+    },
     "backupRules": [
         {
             "sourcePath": "/home/user/some-file",
