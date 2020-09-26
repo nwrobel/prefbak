@@ -1,2 +1,1 @@
--e git+https://github.com/nwrobel/my-python-commons@d78726a143d3adefbb6476888f8b46635c0d48a5#egg=my_python_commons_nwrobel
-pkg-resources==0.0.0
+-e git+https://github.com/nwrobel/my-python-commons#egg=my_python_commons_nwrobel

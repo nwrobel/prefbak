@@ -1,4 +1,6 @@
+~cache
+~logs
+__pycache__
 backupsToAdd.txt
-machine-config/*
-.vscode
-py-venv
+zinc.config.json
+py-venv-linux
