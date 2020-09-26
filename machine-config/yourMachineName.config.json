@@ -1,15 +1,16 @@
-[
-    {
-        "sourcePath": "/home/user/some-file",
-        "backupPath": "destDir/some-file",
-        "compress": "no"
-    },
-    {
-        "sourcePath": "/home/user/some-folder",
-        "backupPath": "destDir/some-folder",
-        "compress": "yes"
-    }
-]
+{
+    "backupRootDir":"/machine/backups/root/dir",
+    "backupRules": [
+        {
+            "sourcePath": "/home/user/some-file",
+            "backupPath": "destDir1"
+        },
+        {
+            "sourcePath": "/home/user/some-folder",
+            "backupPath": "destDir2/subdir"
+        }
+    ]
+}
 
 
 
