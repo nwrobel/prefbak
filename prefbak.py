@@ -38,11 +38,11 @@ def getProjectCacheDir():
     
     return cacheDir
 
-
-
-# https://stackoverflow.com/questions/39327032/how-to-get-the-latest-file-in-a-folder-using-python
-def getMostRecentArchiveFile(archiveDir):
-    fileSearchPattern = mypycommons.file.JoinPaths(archiveDir, ('*' + archiveFileNameSuffix))
+def getMostRecentArchiveFile(archiveInputFilename, archiveDir):
+    fileSearchPattern = mypycommons.file.JoinPaths(
+        archiveDir, 
+        ('*' + archiveInputFilename + archiveFileNameSuffix)
+    )
     allArchiveFiles = glob.glob(fileSearchPattern)
 
     if (allArchiveFiles):
@@ -109,9 +109,9 @@ def performBackupStep(sourcePath, destinationPath):
         logger.info("Backup destination path '{}' does not exist: creating it".format(destinationPath))
         mypycommons.file.createDirectory(destinationPath)
 
-    mostRecentArchiveFile = getMostRecentArchiveFile(destinationPath)
+    mostRecentArchiveFile = getMostRecentArchiveFile(archiveInputFilename=mypycommons.file.GetFilename(sourcePath), archiveDir=destinationPath)
     if (mostRecentArchiveFile):
-        logger.info("Pre-scan found the current most recent archive file in this destination dir: {}".format(mostRecentArchiveFile))
+        logger.info("Pre-scan found the latest pre-existing archive file of the source path in this destination dir: {}".format(mostRecentArchiveFile))
     else:
         logger.info("No most recent archive file found in this destination dir: it must be empty")
 
@@ -135,6 +135,7 @@ def performBackup(configData):
         configFile: the Json prefbak config file
     '''
     backupRootDir = configData['backupRootDir']
+    backupDataPermissions = configData['backupDataPermissions']
     backupRules = configData['backupRules']
 
     for backupRule in backupRules:
@@ -144,9 +145,14 @@ def performBackup(configData):
         logger.info("Performing backup step for rule: {} -> {}".format(sourcePath, destinationPath))
         performBackupStep(sourcePath, destinationPath)
 
+    # Set the permissions on all backed up files so that the user can read them
+    logger.info("Updating file permissions on all archive files in the backup root dir, so that they can be accessed")
+    mypycommons.file.applyPermissionToPath(path=backupRootDir, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
+
 if __name__ == "__main__":
 
-    # For now, set the computer name here
+    # For now, set the computer name here - pass this as a parameter to improve or get this from 
+    # current machine hostname
     computerName = 'zinc'
 
     backupConfigName = '{}.config.json'.format(computerName)
@@ -158,11 +164,7 @@ if __name__ == "__main__":
     logger.info("Config file loaded, beginning prefbak backup routine according to backup rules")
     performBackup(configData)
 
-    logger.info("Backup routine completed successfully")
-
-
-
-
+    logger.info("Backup routine completed successfully, script complete")
 
 
 

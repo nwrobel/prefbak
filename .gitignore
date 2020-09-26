@@ -1,6 +1,5 @@
 ~cache
 ~logs
 __pycache__
-backupsToAdd.txt
 zinc.config.json
 py-venv-linux
