@@ -7,6 +7,7 @@ import tarfile
 import subprocess
 import glob
 import os
+import argparse
 
 from com.nwrobel import mypycommons
 import com.nwrobel.mypycommons.file
@@ -151,11 +152,15 @@ def performBackup(configData):
 
 if __name__ == "__main__":
 
-    # For now, set the computer name here - pass this as a parameter to improve or get this from 
-    # current machine hostname
-    computerName = 'zinc'
+    parser = argparse.ArgumentParser()
+    parser.add_argument("machineName", 
+        help="name of the machine to run the backup routine for: the same name as is used in the machine's backup config file name",
+        type=str
+    )
 
-    backupConfigName = '{}.config.json'.format(computerName)
+    args = parser.parse_args()
+
+    backupConfigName = '{}.config.json'.format(args.machineName)
     backupConfigFilepath = mypycommons.file.JoinPaths('machine-config', backupConfigName)
 
     logger.info("Loading prefbak config file for current machine: {}".format(backupConfigFilepath))
