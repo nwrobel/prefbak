@@ -4,3 +4,4 @@ __pycache__
 machine-backup-prep-scripts
 zinc.config.json
 py-venv-linux
+py-venv-windows
