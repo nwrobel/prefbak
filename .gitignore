@@ -1,7 +1,8 @@
 __pycache__
 ~cache
 ~logs
-machine-backup-prep-scripts
+machine-backup-prep-scripts/*
 zinc.config.json
+copper.config.json
 py-venv-linux
 py-venv-windows

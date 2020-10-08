@@ -1,21 +1,15 @@
 # prefbak
 ## Overview
-This is a tool that allows you to properly backup your application data and other desired files for one or more Linux machines. 
+This is a tool that allows you to properly backup your application data and other desired files for one or more machines. 
 It allows desired backups for each machine to be configured in advance so that backup routines of all critical files can be run easily with few commands.
 Backups will preserve the original Unix file permissions (owner, group, mask) of each source file or directory.
 The tool will create an archive file for each file or folder configured to be backed up and store it at the configured location. The archive file consists of the file/directory compressed as a .tar archive, which is then compressed as a 7z archive. 
 The inner .tar archive is necessary to preserve the file permissions.
 
 ## System Requirements
-- OS: Linux (tested on Ubuntu 18.04)
+- OS: Linux or Windowa (tested on Ubuntu 18.04 and Windows 10)
 - 7zip must be installed and added to the system path
 
-Install 7zip on Ubuntu by running the following:
-```
-sudo apt update
-sudo apt install p7zip-full p7zip-rar
-
-```
 
 ## Installation
 - Clone/download this repo to your local machine
@@ -35,8 +29,14 @@ Before running the backup routine, run the backup prep script for the machine to
 
 Then, cd to the directory of the downloaded project repo and run the backup script with the following:
 
+### For Linux systems:
 ```
 sudo py-venv-linux/bin/python3 prefbak.py machineName
+```
+
+### For Windows systems:
+```
+.\py-venv-windows\Scripts\python.exe prefbak.py copper
 ```
 
 Replace "machineName" with the name of the machine to run the backup routine for. This is the same name you used in the name of the machine's backup config file name.

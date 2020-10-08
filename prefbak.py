@@ -7,7 +7,8 @@ import tarfile
 import subprocess
 import glob
 import os
-import argparse
+import socket
+import sys
 
 from com.nwrobel import mypycommons
 import com.nwrobel.mypycommons.file
@@ -16,6 +17,8 @@ import com.nwrobel.mypycommons.logger
 
 archiveInternalFileContainerName = "archiveInternalFileContainer.tar"
 archiveFileNameSuffix = ".archive.tar.7z"
+runningWindowsOS = False
+sevenZipExeFilepath = ''
 
 def getProjectLogsDir():
     currentDir = mypycommons.file.getThisScriptCurrentDirectory()
@@ -26,10 +29,6 @@ def getProjectLogsDir():
     
     return logsDir
 
-mypycommons.logger.initSharedLogger(logFilename='prefbak.log', logDir=getProjectLogsDir())
-mypycommons.logger.setSharedLoggerConsoleOutputLogLevel('info')
-logger = mypycommons.logger.getSharedLogger()
-
 def getProjectCacheDir():
     currentDir = mypycommons.file.getThisScriptCurrentDirectory()
     cacheDir = mypycommons.file.JoinPaths(currentDir, '~cache')
@@ -39,10 +38,10 @@ def getProjectCacheDir():
     
     return cacheDir
 
-def getMostRecentArchiveFile(archiveInputFilename, archiveDir):
+def getMostRecentArchiveFile(archiveFilename, archiveDir):
     fileSearchPattern = mypycommons.file.JoinPaths(
         archiveDir, 
-        ('*' + archiveInputFilename + archiveFileNameSuffix)
+        ('*' + archiveFilename + archiveFileNameSuffix)
     )
     allArchiveFiles = glob.glob(fileSearchPattern)
 
@@ -54,8 +53,14 @@ def getMostRecentArchiveFile(archiveInputFilename, archiveDir):
     return mostRecentFile
 
 def getArchiveInternalFileContainerHash(archiveFilepath):
-    sevenZipArgs = ['7z', 't', archiveFilepath, archiveInternalFileContainerName, '-scrcsha256']
-    result = subprocess.run(sevenZipArgs, stdout=subprocess.PIPE)
+    if (runningWindowsOS):
+        sevenZipCommand = sevenZipExeFilepath
+    else:
+        sevenZipCommand = '7z'
+
+    runArgs = [sevenZipCommand] + ['t', archiveFilepath, archiveInternalFileContainerName, '-scrcsha256']
+
+    result = subprocess.run(runArgs, stdout=subprocess.PIPE)
     outputString = result.stdout.decode('utf-8')
 
     tarHash = outputString.split('SHA256 for data:')[1].strip()
@@ -64,7 +69,34 @@ def getArchiveInternalFileContainerHash(archiveFilepath):
 def archiveFilesAreIdentical(archiveFile1, archiveFile2):
     return (getArchiveInternalFileContainerHash(archiveFile1) == getArchiveInternalFileContainerHash(archiveFile2))
 
-def compressPathToArchive(inputFilePath):
+def getThisMachineName():
+    return socket.gethostname()
+
+def thisMachineIsWindowsOS():
+    if (os.name == 'nt'):
+        return True
+    else:
+        return False
+
+def createTarArchive(inputFilepath, archiveFilepath):
+    if (runningWindowsOS):
+        sevenZipCommand = sevenZipExeFilepath
+    else:
+        sevenZipCommand = '7z'
+
+    runArgs = [sevenZipCommand] + ['a', '-ttar', archiveFilepath, inputFilepath]
+    subprocess.call(runArgs)    
+
+def createSevenZipArchive(inputFilepath, archiveFilepath):
+    if (runningWindowsOS):
+        sevenZipCommand = sevenZipExeFilepath
+    else:
+        sevenZipCommand = '7z'
+
+    runArgs = [sevenZipCommand] + ['a', '-t7z', '-mx=9', '-mfb=64', '-md=64m', archiveFilepath, inputFilepath]
+    subprocess.call(runArgs)    
+
+def compressPathToArchive(inputFilepath):
     '''
     Compresses the given files and/or directories to a tar archive, then compresses this tar into
     a 7zip archive, given the input filepath(s) and filepath for the archive file. This method 
@@ -72,25 +104,26 @@ def compressPathToArchive(inputFilePath):
     7zip must be installed on the system and 7z must be in the path.
 
     Params:
-        inputFilePath: single path of the file or directory to compress, or a list of paths
+        inputFilepath: single path of the file or directory to compress, or a list of paths
         archiveOutFilePath: filepath of the archive file to output to, filename should not include
             the .tar.gz extension
     '''
     archiveName = '[{}] {}{}'.format(
         mypycommons.time.getCurrentTimestampForFilename(), 
-        mypycommons.file.GetFilename(inputFilePath),
+        mypycommons.file.GetFilename(inputFilepath),
         archiveFileNameSuffix
     ) 
 
     archiveInternalFileContainerFilepath = mypycommons.file.JoinPaths(getProjectCacheDir(), archiveInternalFileContainerName)
     archiveFilepath = mypycommons.file.JoinPaths(getProjectCacheDir(), archiveName)
 
-    with tarfile.open(archiveInternalFileContainerFilepath, 'w') as archive:
-        archive.add(inputFilePath, arcname=mypycommons.file.GetFilename(inputFilePath))
-    
-    sevenZipArgs = ['7z', 'a', '-t7z', '-mx=9', '-mfb=64', '-md=64m', archiveFilepath, archiveInternalFileContainerFilepath]
-    subprocess.call(sevenZipArgs)
+    logger.info("Creating internal tar archive file at {}".format(archiveInternalFileContainerFilepath))
+    createTarArchive(inputFilepath=inputFilepath, archiveFilepath=archiveInternalFileContainerFilepath)
 
+    logger.info("Creating high compression 7zip archive at {}".format(archiveFilepath))
+    createSevenZipArchive(inputFilepath=archiveInternalFileContainerFilepath, archiveFilepath=archiveFilepath)
+
+    logger.info("Removing the temporary tar archive file that was produced")
     mypycommons.file.DeleteFile(archiveInternalFileContainerFilepath)
 
     return archiveFilepath
@@ -110,7 +143,7 @@ def performBackupStep(sourcePath, destinationPath):
         logger.info("Backup destination path '{}' does not exist: creating it".format(destinationPath))
         mypycommons.file.createDirectory(destinationPath)
 
-    mostRecentArchiveFile = getMostRecentArchiveFile(archiveInputFilename=mypycommons.file.GetFilename(sourcePath), archiveDir=destinationPath)
+    mostRecentArchiveFile = getMostRecentArchiveFile(archiveFilename=mypycommons.file.GetFilename(sourcePath), archiveDir=destinationPath)
     if (mostRecentArchiveFile):
         logger.info("Pre-scan found the latest pre-existing archive file of the source path in this destination dir: {}".format(mostRecentArchiveFile))
     else:
@@ -118,7 +151,6 @@ def performBackupStep(sourcePath, destinationPath):
 
     logger.info("Compressing new archive from source data and writing it to ~cache")
     newArchiveFile = compressPathToArchive(sourcePath)
-    logger.info("Finished compresing archive, created file: {}".format(newArchiveFile))
 
     if (mostRecentArchiveFile and archiveFilesAreIdentical(mostRecentArchiveFile, newArchiveFile)):
         logger.info("An archive with the same data as the newly created archive exists in the destination: discarding new archive file")
@@ -147,26 +179,67 @@ def performBackup(configData):
         performBackupStep(sourcePath, destinationPath)
 
     # Set the permissions on all backed up files so that the user can read them
-    logger.info("Updating file permissions on all archive files in the backup root dir, so that they can be accessed")
-    mypycommons.file.applyPermissionToPath(path=backupRootDir, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
+    if (not runningWindowsOS):
+        logger.info("Updating file permissions on all archive files in the backup root dir, so that they can be accessed")
+        mypycommons.file.applyPermissionToPath(path=backupRootDir, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("machineName", 
-        help="name of the machine to run the backup routine for: the same name as is used in the machine's backup config file name",
-        type=str
-    )
+    thisProjectDir = mypycommons.file.getThisScriptCurrentDirectory()
+    thisProjectLogsDir = getProjectLogsDir()
+    thisProjectConfigDir = mypycommons.file.JoinPaths(thisProjectDir, 'machine-config')
+    thisProjectPrepScriptsDir = mypycommons.file.JoinPaths(thisProjectDir, 'machine-backup-prep-scripts')
 
-    args = parser.parse_args()
+    # Setup logging for this script
+    logFilename = 'prefbak.log'
+    mypycommons.logger.initSharedLogger(logFilename=logFilename, logDir=thisProjectLogsDir)
+    mypycommons.logger.setSharedLoggerConsoleOutputLogLevel('info')
+    logger = mypycommons.logger.getSharedLogger()
 
-    backupConfigName = '{}.config.json'.format(args.machineName)
-    backupConfigFilepath = mypycommons.file.JoinPaths('machine-config', backupConfigName)
+    machineName = getThisMachineName()
+    runningWindowsOS = thisMachineIsWindowsOS()
 
-    logger.info("Loading prefbak config file for current machine: {}".format(backupConfigFilepath))
+    if (runningWindowsOS):
+        sevenZipExeFilepath = "C:\\Program Files\\7-Zip\\7z.exe"
+
+    backupConfigName = '{}.config.json'.format(machineName)
+    backupConfigFilepath = mypycommons.file.JoinPaths(thisProjectConfigDir, backupConfigName)
+
+    logger.info("Starting prefbak backup routine script for machine '{}'".format(machineName))
+
+    logger.info("Loading this machine's prefbak config file: {}".format(backupConfigFilepath))
     configData = mypycommons.file.readJsonFile(backupConfigFilepath)
 
-    logger.info("Config file loaded, beginning prefbak backup routine according to backup rules")
+    # Change permission on the log file to whatever permissions are configured in the machine config file
+    # so that the user can read the log file (if the log file is created when running this script as
+    # sudo, it will not be readable by other users)
+    if (not runningWindowsOS):
+        logger.info("Setting the log file permissions to those set in the machine's config file")
+        logFilepath = mypycommons.file.JoinPaths(thisProjectLogsDir, logFilename)
+        backupDataPermissions = configData['backupDataPermissions']
+        mypycommons.file.applyPermissionToPath(path=logFilepath, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
+
+    # Run the prep script, if this is configured for the machine
+    if (configData['prepScript'] == 'true'):
+        if (runningWindowsOS):
+            prepScriptName = "backup-prep-{}.ps1".format(machineName)
+        else:
+            prepScriptName = "backup-prep-{}.sh".format(machineName)
+
+        prepScriptFilepath = mypycommons.file.JoinPaths(thisProjectPrepScriptsDir, prepScriptName)
+
+        if (runningWindowsOS):
+            powershellExeFilepath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+            runArgs = [powershellExeFilepath, prepScriptFilepath]
+        else:
+            runArgs = [prepScriptFilepath]
+
+        logger.info("Prep script configured for this machine: running script before doing the backup: {}".format(prepScriptFilepath))
+        subprocess.call(runArgs, shell=True)
+        logger.info("Prep script execution complete".format(prepScriptFilepath))
+        
+
+    logger.info("Beginning prefbak backup routine according to backup rules")
     performBackup(configData)
 
     logger.info("Backup routine completed successfully, script complete")
