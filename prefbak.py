@@ -53,6 +53,10 @@ def getMostRecentArchiveFile(archiveFilename, archiveDir):
 
     return mostRecentFile
 
+# TODO: fix a bug here
+# currently, two archive files have different hashes even if the files they contain have exact same hashes
+# but they have different timestamps - timestamp on file contained in tar file is affecting checksum of the tar file
+# Fix this by instead of getting hash of the tar archive, get hash of each file in the archive and compare to the other one in the other archive
 def getArchiveInternalFileContainerHash(archiveFilepath):
     if (runningWindowsOS):
         sevenZipCommand = sevenZipExeFilepath
@@ -134,6 +138,10 @@ def compressPathToArchive(inputFilepath):
 
     return archiveFilepath
 
+# TODO: performance increase
+# before creating tar or 7zip of source, compare source path checksum to the most recent archive file's contents checksum
+# if path is a dir, check each corresponding file to see if they match
+# If no differences, then do not make the archive
 def performBackupStep(sourcePath, destinationPath):
     '''
     Performs a single backup operation. Files can either be mirrored/copied from the source path to 
