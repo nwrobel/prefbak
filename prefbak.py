@@ -19,6 +19,7 @@ archiveInternalFileContainerName = "archiveInternalFileContainer.tar"
 archiveFileNameSuffix = ".archive.tar.7z"
 runningWindowsOS = False
 sevenZipExeFilepath = ''
+powershellExeFilepath = ''
 
 # ----------------------------- Script helper functions --------------------------------------------
 def getProjectLogsDir():
@@ -71,8 +72,40 @@ def getArchiveInternalFileContainerHash(archiveFilepath):
     tarHash = outputString.split('SHA256 for data:')[1].strip()
     return tarHash
 
+def getFileHash(filepath):
+    if (runningWindowsOS):
+        powershellCommand = "(Get-FileHash {} -Algorithm SHA256).Hash".format(filepath)
+        result = subprocess.run([powershellExeFilepath, powershellCommand], stdout=subprocess.PIPE)
+        hashString = result.stdout.decode('utf-8')
+    else:
+        result = subprocess.run(['sha256sum', filepath], stdout=subprocess.PIPE)
+        output = result.stdout.decode('utf-8')
+        hashString = output.split(" ")[0].strip()
+
+    return hashString.upper()
+
 def archiveFilesAreIdentical(archiveFile1, archiveFile2):
     return (getArchiveInternalFileContainerHash(archiveFile1) == getArchiveInternalFileContainerHash(archiveFile2))
+
+def getTarArchiveContentsChecksum(archiveFilepath):
+    with tarfile.open(archiveFilepath, 'r') as archive:
+        archiveContents = archive.getmembers()
+        contentsHashes = []
+
+        for archiveFile in archiveContents:
+            print(archiveFile.path)
+            fileHash = getFileHash(archiveFile.path)
+            contentsHashes.append(fileHash)
+
+    return contentsHashes
+    
+
+def tarArchiveFilesHaveSameData(archiveFile1, archiveFile2):
+    checksumsArchive1 = getTarArchiveContentsChecksum(archiveFile1)
+    checksumsArchive2 = getTarArchiveContentsChecksum(archiveFile2)
+
+    
+
 
 def getThisMachineName():
     return socket.gethostname()
@@ -217,6 +250,7 @@ if __name__ == "__main__":
 
     if (runningWindowsOS):
         sevenZipExeFilepath = "C:\\Program Files\\7-Zip\\7z.exe"
+        powershellExeFilepath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
 
         if (mypycommons.file.fileExists(sevenZipExeFilepath)):
             logger.info("Using the 7zip executable program located at {}".format(sevenZipExeFilepath))
@@ -226,44 +260,45 @@ if __name__ == "__main__":
     backupConfigName = '{}.config.json'.format(machineName)
     backupConfigFilepath = mypycommons.file.JoinPaths(thisProjectConfigDir, backupConfigName)
 
-    logger.info("Starting prefbak backup routine script for machine '{}'".format(machineName))
+    x = getFileHash(backupConfigFilepath)
+    print(x)
+    # logger.info("Starting prefbak backup routine script for machine '{}'".format(machineName))
 
-    logger.info("Loading this machine's prefbak config file: {}".format(backupConfigFilepath))
-    configData = mypycommons.file.readJsonFile(backupConfigFilepath)
+    # logger.info("Loading this machine's prefbak config file: {}".format(backupConfigFilepath))
+    # configData = mypycommons.file.readJsonFile(backupConfigFilepath)
 
-    # Change permission on the log file to whatever permissions are configured in the machine config file
-    # so that the user can read the log file (if the log file is created when running this script as
-    # sudo, it will not be readable by other users)
-    if (not runningWindowsOS):
-        logger.info("Setting the log file permissions to those set in the machine's config file")
-        logFilepath = mypycommons.file.JoinPaths(thisProjectLogsDir, logFilename)
-        backupDataPermissions = configData['backupDataPermissions']
-        mypycommons.file.applyPermissionToPath(path=logFilepath, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
+    # # Change permission on the log file to whatever permissions are configured in the machine config file
+    # # so that the user can read the log file (if the log file is created when running this script as
+    # # sudo, it will not be readable by other users)
+    # if (not runningWindowsOS):
+    #     logger.info("Setting the log file permissions to those set in the machine's config file")
+    #     logFilepath = mypycommons.file.JoinPaths(thisProjectLogsDir, logFilename)
+    #     backupDataPermissions = configData['backupDataPermissions']
+    #     mypycommons.file.applyPermissionToPath(path=logFilepath, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
 
-    # Run the prep script, if this is configured for the machine
-    if (configData['prepScript'] == 'true'):
-        if (runningWindowsOS):
-            prepScriptName = "backup-prep-{}.ps1".format(machineName)
-        else:
-            prepScriptName = "backup-prep-{}.sh".format(machineName)
+    # # Run the prep script, if this is configured for the machine
+    # if (configData['prepScript'] == 'true'):
+    #     if (runningWindowsOS):
+    #         prepScriptName = "backup-prep-{}.ps1".format(machineName)
+    #     else:
+    #         prepScriptName = "backup-prep-{}.sh".format(machineName)
 
-        prepScriptFilepath = mypycommons.file.JoinPaths(thisProjectPrepScriptsDir, prepScriptName)
+    #     prepScriptFilepath = mypycommons.file.JoinPaths(thisProjectPrepScriptsDir, prepScriptName)
 
-        if (runningWindowsOS):
-            powershellExeFilepath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-            runArgs = [powershellExeFilepath, prepScriptFilepath]
-        else:
-            runArgs = [prepScriptFilepath]
+    #     if (runningWindowsOS):
+    #         runArgs = [powershellExeFilepath, prepScriptFilepath]
+    #     else:
+    #         runArgs = [prepScriptFilepath]
 
-        logger.info("Prep script configured for this machine: running script before doing the backup: {}".format(prepScriptFilepath))
-        subprocess.call(runArgs, shell=True)
-        logger.info("Prep script execution complete".format(prepScriptFilepath))
+    #     logger.info("Prep script configured for this machine: running script before doing the backup: {}".format(prepScriptFilepath))
+    #     subprocess.call(runArgs, shell=True)
+    #     logger.info("Prep script execution complete".format(prepScriptFilepath))
         
 
-    logger.info("Beginning prefbak backup routine according to backup rules")
-    performBackup(configData)
+    # logger.info("Beginning prefbak backup routine according to backup rules")
+    # performBackup(configData)
 
-    logger.info("Backup routine completed successfully, script complete")
+    # logger.info("Backup routine completed successfully, script complete")
 
 
 
