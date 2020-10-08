@@ -4,6 +4,7 @@ backup rules defined in that machine's prefbak config file.
 '''
 
 import subprocess
+import tarfile
 import glob
 import os
 import socket
@@ -79,13 +80,18 @@ def thisMachineIsWindowsOS():
         return False
 
 def createTarArchive(inputFilepath, archiveFilepath):
+    '''
+    Creates a tar archive from the specified path (file or directory). Timestamp and permissions 
+    are preserved. On windows, this is done using 7zip. On Linux, it uses the 'tar' command.
+    '''
     if (runningWindowsOS):
-        sevenZipCommand = sevenZipExeFilepath
-    else:
-        sevenZipCommand = '7z'
+        runArgs = [sevenZipCommand, 'a', '-ttar', archiveFilepath, inputFilepath]
+        subprocess.call(runArgs)    
 
-    runArgs = [sevenZipCommand] + ['a', '-ttar', archiveFilepath, inputFilepath]
-    subprocess.call(runArgs)    
+    else:
+        with tarfile.open(archiveFilepath, 'w') as archive:
+            archive.add(inputFilepath, arcname=mypycommons.file.GetFilename(inputFilepath))
+
 
 def createSevenZipArchive(inputFilepath, archiveFilepath):
     if (runningWindowsOS):
