@@ -89,7 +89,7 @@ def createTarArchive(inputFilepath, archiveFilepath):
     are preserved. On windows, this is done using 7zip. On Linux, it uses the 'tar' command.
     '''
     if (runningWindowsOS):
-        runArgs = [sevenZipCommand, 'a', '-ttar', archiveFilepath, inputFilepath]
+        runArgs = [sevenZipExeFilepath, 'a', '-ttar', archiveFilepath, inputFilepath]
         subprocess.call(runArgs)    
 
     else:
@@ -181,21 +181,22 @@ def performBackup(configData):
     Params:
         configFile: the Json prefbak config file
     '''
-    backupRootDir = configData['backupRootDir']
     backupDataPermissions = configData['backupDataPermissions']
     backupRules = configData['backupRules']
 
     for backupRule in backupRules:
         sourcePath = backupRule['sourcePath']
-        destinationPath = mypycommons.file.JoinPaths(backupRootDir, backupRule['backupPath'])
+        destinationPath = backupRule['backupDestDir']
 
         logger.info("Performing backup step for rule: {} -> {}".format(sourcePath, destinationPath))
         performBackupStep(sourcePath, destinationPath)
 
-    # Set the permissions on all backed up files so that the user can read them
-    if (not runningWindowsOS):
-        logger.info("Updating file permissions on all archive files in the backup root dir, so that they can be accessed")
-        mypycommons.file.applyPermissionToPath(path=backupRootDir, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
+        # Set the permissions on the destination path and the archive file within so that the user can read the backup
+        if (not runningWindowsOS):
+            logger.info("Updating file permissions for backup destination directory {}".format(destinationPath))
+            mypycommons.file.applyPermissionToPath(path=destinationPath, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'], recursive=True)
+
+
 
 # ------------------------------------ Script 'main' execution -------------------------------------
 if __name__ == "__main__":
