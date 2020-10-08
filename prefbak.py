@@ -3,23 +3,23 @@ Script that performs a "prefbak" routine: that is, performs a backup of a machin
 backup rules defined in that machine's prefbak config file.
 '''
 
-import tarfile
 import subprocess
 import glob
 import os
 import socket
-import sys
 
 from com.nwrobel import mypycommons
 import com.nwrobel.mypycommons.file
 import com.nwrobel.mypycommons.time
 import com.nwrobel.mypycommons.logger
 
+# Module-wide global variables, used by many of the helper functions below
 archiveInternalFileContainerName = "archiveInternalFileContainer.tar"
 archiveFileNameSuffix = ".archive.tar.7z"
 runningWindowsOS = False
 sevenZipExeFilepath = ''
 
+# ----------------------------- Script helper functions --------------------------------------------
 def getProjectLogsDir():
     currentDir = mypycommons.file.getThisScriptCurrentDirectory()
     logsDir = mypycommons.file.JoinPaths(currentDir, '~logs')
@@ -183,6 +183,7 @@ def performBackup(configData):
         logger.info("Updating file permissions on all archive files in the backup root dir, so that they can be accessed")
         mypycommons.file.applyPermissionToPath(path=backupRootDir, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
 
+# ------------------------------------ Script 'main' execution -------------------------------------
 if __name__ == "__main__":
 
     thisProjectDir = mypycommons.file.getThisScriptCurrentDirectory()
@@ -201,6 +202,11 @@ if __name__ == "__main__":
 
     if (runningWindowsOS):
         sevenZipExeFilepath = "C:\\Program Files\\7-Zip\\7z.exe"
+
+        if (mypycommons.file.fileExists(sevenZipExeFilepath)):
+            logger.info("Using the 7zip executable program located at {}".format(sevenZipExeFilepath))
+        else:
+            raise FileNotFoundError("7zip executable program was not found at the default location on this system ({} does not exist)".format(sevenZipExeFilepath))
 
     backupConfigName = '{}.config.json'.format(machineName)
     backupConfigFilepath = mypycommons.file.JoinPaths(thisProjectConfigDir, backupConfigName)
