@@ -8,6 +8,8 @@ import tarfile
 import glob
 import os
 import socket
+import fnmatch
+
 
 from com.nwrobel import mypycommons
 import com.nwrobel.mypycommons.file
@@ -40,7 +42,7 @@ def getProjectCacheDir():
     
     return cacheDir
 
-def getMostRecentArchiveFile(archiveFilename, archiveDir):
+def getMostRecentArchiveFile(archivePartialFilename, archiveDir):
     fileSearchPattern = mypycommons.file.JoinPaths(
         archiveDir, 
         ('*' + archiveFilename + archiveFileNameSuffix)
@@ -54,24 +56,6 @@ def getMostRecentArchiveFile(archiveFilename, archiveDir):
 
     return mostRecentFile
 
-# TODO: fix a bug here
-# currently, two archive files have different hashes even if the files they contain have exact same hashes
-# but they have different timestamps - timestamp on file contained in tar file is affecting checksum of the tar file
-# Fix this by instead of getting hash of the tar archive, get hash of each file in the archive and compare to the other one in the other archive
-def getArchiveInternalFileContainerHash(archiveFilepath):
-    if (runningWindowsOS):
-        sevenZipCommand = sevenZipExeFilepath
-    else:
-        sevenZipCommand = '7z'
-
-    runArgs = [sevenZipCommand] + ['t', archiveFilepath, archiveInternalFileContainerName, '-scrcsha256']
-
-    result = subprocess.run(runArgs, stdout=subprocess.PIPE)
-    outputString = result.stdout.decode('utf-8')
-
-    tarHash = outputString.split('SHA256 for data:')[1].strip()
-    return tarHash
-
 def getFileHash(filepath):
     if (runningWindowsOS):
         powershellCommand = "(Get-FileHash {} -Algorithm SHA256).Hash".format(filepath)
@@ -84,27 +68,127 @@ def getFileHash(filepath):
 
     return hashString.upper()
 
-def archiveFilesAreIdentical(archiveFile1, archiveFile2):
-    return (getArchiveInternalFileContainerHash(archiveFile1) == getArchiveInternalFileContainerHash(archiveFile2))
-
-def getTarArchiveContentsChecksum(archiveFilepath):
-    with tarfile.open(archiveFilepath, 'r') as archive:
-        archiveContents = archive.getmembers()
-        contentsHashes = []
-
-        for archiveFile in archiveContents:
-            print(archiveFile.path)
-            fileHash = getFileHash(archiveFile.path)
-            contentsHashes.append(fileHash)
-
-    return contentsHashes
-    
-
-def tarArchiveFilesHaveSameData(archiveFile1, archiveFile2):
-    checksumsArchive1 = getTarArchiveContentsChecksum(archiveFile1)
-    checksumsArchive2 = getTarArchiveContentsChecksum(archiveFile2)
 
     
+def get7zArchiveItemsNameAndType(archiveFilepath):
+    if (runningWindowsOS):
+        sevenZipCommand = sevenZipExeFilepath
+    else:
+        sevenZipCommand = '7z'
+
+    runArgs = [sevenZipCommand] + ['l', '-slt', '-ba', archiveFilepath]
+    runResult = subprocess.run(runArgs, stdout=subprocess.PIPE)
+    
+    output = runResult.stdout.decode('utf-8')
+    outputLines = output.split('\n')
+    itemNameLines = fnmatch.filter(outputLines, 'Path = *')
+    itemAttrLines = fnmatch.filter(outputLines, 'Attributes = *')
+    
+    archiveItemsNames = []
+    for index, itemNameLine in enumerate(itemNameLines):
+        itemName = itemNameLine.replace('Path = ', '')
+        itemAttrs = itemAttrLines[index].replace('Attributes = ', '')
+
+        if ('D_' in itemAttrs): 
+            itemType = 'directory'
+        else:
+            itemType = 'file'
+
+        archiveItemsNames.append({
+            'pathName': itemName,
+            'type': itemType
+        })
+
+    return archiveItemsNames
+    
+def get7zArchiveItemHash(archiveFilepath, archiveItemName):
+    if (runningWindowsOS):
+        sevenZipCommand = sevenZipExeFilepath
+    else:
+        sevenZipCommand = '7z'
+
+    runArgs = [sevenZipCommand] + ['t', '-scrcsha256', archiveFilepath, archiveItemName]
+    runResult = subprocess.run(runArgs, stdout=subprocess.PIPE)
+
+    output = runResult.stdout.decode('utf-8')
+    itemHash = output.split('SHA256 for data:')[1].strip()
+
+    return itemHash
+
+def _getContentChecksumInfoFor7zArchive(archiveFilepath):
+    archiveItemsNameAndType = get7zArchiveItemsNameAndType(archiveFilepath)
+    archiveContentInfo = []
+
+    for item in archiveItemsNameAndType:
+        if (item['type'] == 'file'):
+            itemHash = get7zArchiveItemHash(archiveFilepath, item['pathName'])
+        else:
+            itemHash = None
+
+        itemInfo = {
+            'pathName': item['pathName'],
+            'type': item['type'],
+            'hash': itemHash
+        }
+        archiveContentInfo.append(itemInfo)
+    
+    return archiveContentInfo
+
+def _getContentChecksumInfoForPath(filepath):
+    allItemsPaths = mypycommons.file.GetAllFilesAndDirectoriesRecursive(rootPath=filepath)
+    allItemsPaths += [filepath]
+
+    baseFilename = mypycommons.file.GetFilename(filepath)
+    trimThisFromPaths = filepath.replace(baseFilename, '')
+
+    itemRelativePaths = []
+    for itemPath in allItemsPaths:
+        relativePath = itemPath.replace(trimThisFromPaths, '')
+        itemRelativePaths.append(relativePath)
+
+    itemRelativePaths.sort()
+
+    pathContentsInfo = []
+    for itemRelativePath in itemRelativePaths:
+        itemAbsolutePath = trimThisFromPaths + itemRelativePath
+        
+        if (mypycommons.file.fileExists(itemAbsolutePath)):
+            itemType = 'file'
+            itemHash = getFileHash(itemAbsolutePath)
+        elif (mypycommons.file.directoryExists(itemAbsolutePath)):
+            itemType = 'directory'
+            itemHash = None
+        else:
+            raise "Error: the given path does not exist: {}".format(itemAbsolutePath)
+        
+        itemInfo = {
+            'pathName': itemRelativePath,
+            'type': itemType,
+            'hash': itemHash
+        }
+        pathContentsInfo.append(itemInfo)
+
+    return pathContentsInfo
+    
+
+
+
+def sourceDataMatchesExistingArchive(sourcePath, archiveFilepath):
+    archiveFileInfo = _getContentChecksumInfoFor7zArchive(archiveFilepath)
+    pathFileInfo = _getContentChecksumInfoForPath(sourcePath)
+
+    archiveFileInfoSorted = sorted(archiveFileInfo, key=lambda k: k['pathName']) 
+    pathFileInfoSorted = sorted(pathFileInfo, key=lambda k: k['pathName']) 
+
+    print(archiveFileInfoSorted)
+    print()
+    print(pathFileInfoSorted)
+
+    if (archiveFileInfoSorted == pathFileInfoSorted):
+        return True
+    else:
+        return False
+            
 
 
 def getThisMachineName():
@@ -116,65 +200,16 @@ def thisMachineIsWindowsOS():
     else:
         return False
 
-def createTarArchive(inputFilepath, archiveFilepath):
-    '''
-    Creates a tar archive from the specified path (file or directory). Timestamp and permissions 
-    are preserved. On windows, this is done using 7zip. On Linux, it uses the 'tar' command.
-    '''
-    if (runningWindowsOS):
-        runArgs = [sevenZipExeFilepath, 'a', '-ttar', archiveFilepath, inputFilepath]
-        subprocess.call(runArgs)    
 
-    else:
-        with tarfile.open(archiveFilepath, 'w') as archive:
-            archive.add(inputFilepath, arcname=mypycommons.file.GetFilename(inputFilepath))
-
-
-def createSevenZipArchive(inputFilepath, archiveFilepath):
+def create7zArchive(sourcePath, archiveFilepath):
     if (runningWindowsOS):
         sevenZipCommand = sevenZipExeFilepath
     else:
         sevenZipCommand = '7z'
 
-    runArgs = [sevenZipCommand] + ['a', '-t7z', '-mx=9', '-mfb=64', '-md=64m', archiveFilepath, inputFilepath]
+    runArgs = [sevenZipCommand] + ['a', '-t7z', '-mx=9', '-mfb=64', '-md=64m', archiveFilepath, sourcePath]
     subprocess.call(runArgs)    
 
-def compressPathToArchive(inputFilepath):
-    '''
-    Compresses the given files and/or directories to a tar archive, then compresses this tar into
-    a 7zip archive, given the input filepath(s) and filepath for the archive file. This method 
-    preserves the owner:group permissions on the files while allowing them to be compressed with 7z.
-    7zip must be installed on the system and 7z must be in the path.
-
-    Params:
-        inputFilepath: single path of the file or directory to compress, or a list of paths
-        archiveOutFilePath: filepath of the archive file to output to, filename should not include
-            the .tar.gz extension
-    '''
-    archiveName = '[{}] {}{}'.format(
-        mypycommons.time.getCurrentTimestampForFilename(), 
-        mypycommons.file.GetFilename(inputFilepath),
-        archiveFileNameSuffix
-    ) 
-
-    archiveInternalFileContainerFilepath = mypycommons.file.JoinPaths(getProjectCacheDir(), archiveInternalFileContainerName)
-    archiveFilepath = mypycommons.file.JoinPaths(getProjectCacheDir(), archiveName)
-
-    logger.info("Creating internal tar archive file at {}".format(archiveInternalFileContainerFilepath))
-    createTarArchive(inputFilepath=inputFilepath, archiveFilepath=archiveInternalFileContainerFilepath)
-
-    logger.info("Creating high compression 7zip archive at {}".format(archiveFilepath))
-    createSevenZipArchive(inputFilepath=archiveInternalFileContainerFilepath, archiveFilepath=archiveFilepath)
-
-    logger.info("Removing the temporary tar archive file that was produced")
-    mypycommons.file.DeleteFile(archiveInternalFileContainerFilepath)
-
-    return archiveFilepath
-
-# TODO: performance increase
-# before creating tar or 7zip of source, compare source path checksum to the most recent archive file's contents checksum
-# if path is a dir, check each corresponding file to see if they match
-# If no differences, then do not make the archive
 def performBackupStep(sourcePath, destinationPath):
     '''
     Performs a single backup operation. Files can either be mirrored/copied from the source path to 
@@ -190,22 +225,27 @@ def performBackupStep(sourcePath, destinationPath):
         logger.info("Backup destination path '{}' does not exist: creating it".format(destinationPath))
         mypycommons.file.createDirectory(destinationPath)
 
-    mostRecentArchiveFile = getMostRecentArchiveFile(archiveFilename=mypycommons.file.GetFilename(sourcePath), archiveDir=destinationPath)
+    mostRecentArchiveFile = getMostRecentArchiveFile(archivePartialFilename=mypycommons.file.GetFilename(sourcePath), archiveDir=destinationPath)
     if (mostRecentArchiveFile):
         logger.info("Pre-scan found the latest pre-existing archive file of the source path in this destination dir: {}".format(mostRecentArchiveFile))
     else:
-        logger.info("No most recent archive file found in this destination dir: it must be empty")
+        logger.info("No pre-existing archive file found in this destination dir: it must be empty")
 
-    logger.info("Compressing new archive from source data and writing it to ~cache")
-    newArchiveFile = compressPathToArchive(sourcePath)
-
-    if (mostRecentArchiveFile and archiveFilesAreIdentical(mostRecentArchiveFile, newArchiveFile)):
-        logger.info("An archive with the same data as the newly created archive exists in the destination: discarding new archive file")
-        mypycommons.file.DeleteFile(newArchiveFile)
+    if (mostRecentArchiveFile and sourceDataMatchesExistingArchive(sourcePath, mostRecentArchiveFile)):
+        logger.info("An archive with the same data as the source already exists in the destination: no new backup archive will be created")
 
     else:
-        logger.info("The newly created archive has unique data: no duplicate archives found in destination - moving new archive file from ~cache to destination")
-        mypycommons.file.moveFileToDirectory(newArchiveFile, destinationPath)
+        logger.info("Latest archive doesn't contain the latest source data: a new backup archive will be created")
+
+        archiveName = '[{}] {}{}'.format(
+            mypycommons.time.getCurrentTimestampForFilename(), 
+            mypycommons.file.GetFilename(sourcePath),
+            archiveFileNameSuffix
+        ) 
+        archiveFilepath = mypycommons.file.JoinPaths(destinationPath, archiveName)
+
+        logger.info("Creating new backup archive now at {}".format(archiveFilepath))
+        create7zArchive(sourcePath, archiveFilepath)
 
 def performBackup(configData):
     '''
@@ -242,7 +282,7 @@ if __name__ == "__main__":
     # Setup logging for this script
     logFilename = 'prefbak.log'
     mypycommons.logger.initSharedLogger(logFilename=logFilename, logDir=thisProjectLogsDir)
-    mypycommons.logger.setSharedLoggerConsoleOutputLogLevel('info')
+    mypycommons.logger.setSharedLoggerConsoleOutputLogLevel('debug')
     logger = mypycommons.logger.getSharedLogger()
 
     machineName = getThisMachineName()
@@ -260,8 +300,31 @@ if __name__ == "__main__":
     backupConfigName = '{}.config.json'.format(machineName)
     backupConfigFilepath = mypycommons.file.JoinPaths(thisProjectConfigDir, backupConfigName)
 
-    x = getFileHash(backupConfigFilepath)
-    print(x)
+    # x = getFileHash('/datastore/nick/Temp/archive.tar')
+    # print(x)
+    # x = getFileHash('/datastore/nick/Temp/archive2.tar')
+    # print(x)
+
+    # x= get7zArchiveItemsNameAndType('/datastore/nick/Temp/archive3.7z')
+    # print(x)
+    # x = get7zArchiveItemHash('/datastore/nick/Temp/archive3.7z', 'test')
+    # print(x)
+
+    # x = get7zArchiveContentInfo('/datastore/nick/Temp/archive2.7z')
+    # print(x)
+
+
+    y = sourceDataMatchesExistingArchive('/home/nick/.vim', '/datastore/nick/Temp/archive2.7z')
+    print(y)
+
+
+    # create7zArchive('/home/nick/.vim', '/datastore/nick/Temp/archive10.7z')
+
+    #x = getTarArchiveContentsChecksum('/datastore/nick/Temp/archive.tar')
+
+
+
+
     # logger.info("Starting prefbak backup routine script for machine '{}'".format(machineName))
 
     # logger.info("Loading this machine's prefbak config file: {}".format(backupConfigFilepath))
