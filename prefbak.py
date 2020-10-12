@@ -17,8 +17,7 @@ import com.nwrobel.mypycommons.time
 import com.nwrobel.mypycommons.logger
 
 # Module-wide global variables, used by many of the helper functions below
-archiveInternalFileContainerName = "archiveInternalFileContainer.tar"
-archiveFileNameSuffix = ".archive.tar.7z"
+archiveFileNameSuffix = ".archive.7z"
 runningWindowsOS = False
 sevenZipExeFilepath = ''
 powershellExeFilepath = ''
@@ -45,7 +44,7 @@ def getProjectCacheDir():
 def getMostRecentArchiveFile(archivePartialFilename, archiveDir):
     fileSearchPattern = mypycommons.file.JoinPaths(
         archiveDir, 
-        ('*' + archiveFilename + archiveFileNameSuffix)
+        ('*' + archivePartialFilename + archiveFileNameSuffix)
     )
     allArchiveFiles = glob.glob(fileSearchPattern)
 
@@ -68,8 +67,6 @@ def getFileHash(filepath):
 
     return hashString.upper()
 
-
-    
 def get7zArchiveItemsNameAndType(archiveFilepath):
     if (runningWindowsOS):
         sevenZipCommand = sevenZipExeFilepath
@@ -170,9 +167,6 @@ def _getContentChecksumInfoForPath(filepath):
 
     return pathContentsInfo
     
-
-
-
 def sourceDataMatchesExistingArchive(sourcePath, archiveFilepath):
     archiveFileInfo = _getContentChecksumInfoFor7zArchive(archiveFilepath)
     pathFileInfo = _getContentChecksumInfoForPath(sourcePath)
@@ -180,17 +174,15 @@ def sourceDataMatchesExistingArchive(sourcePath, archiveFilepath):
     archiveFileInfoSorted = sorted(archiveFileInfo, key=lambda k: k['pathName']) 
     pathFileInfoSorted = sorted(pathFileInfo, key=lambda k: k['pathName']) 
 
-    print(archiveFileInfoSorted)
-    print()
-    print(pathFileInfoSorted)
+    # print(archiveFileInfoSorted)
+    # print()
+    # print(pathFileInfoSorted)
 
     if (archiveFileInfoSorted == pathFileInfoSorted):
         return True
     else:
         return False
             
-
-
 def getThisMachineName():
     return socket.gethostname()
 
@@ -199,7 +191,6 @@ def thisMachineIsWindowsOS():
         return True
     else:
         return False
-
 
 def create7zArchive(sourcePath, archiveFilepath):
     if (runningWindowsOS):
@@ -235,7 +226,7 @@ def performBackupStep(sourcePath, destinationPath):
         logger.info("An archive with the same data as the source already exists in the destination: no new backup archive will be created")
 
     else:
-        logger.info("Latest archive doesn't contain the latest source data: a new backup archive will be created")
+        logger.info("Latest archive doesn't exist or doesn't contain the latest source data: a new backup archive will be created")
 
         archiveName = '[{}] {}{}'.format(
             mypycommons.time.getCurrentTimestampForFilename(), 
@@ -314,54 +305,49 @@ if __name__ == "__main__":
     # print(x)
 
 
-    y = sourceDataMatchesExistingArchive('/home/nick/.vim', '/datastore/nick/Temp/archive2.7z')
-    print(y)
+    # y = sourceDataMatchesExistingArchive('/home/nick/.vimrc', '/datastore/nick/Temp/archive5.7z')
+    # print(y)
 
 
     # create7zArchive('/home/nick/.vim', '/datastore/nick/Temp/archive10.7z')
 
-    #x = getTarArchiveContentsChecksum('/datastore/nick/Temp/archive.tar')
+    logger.info("Starting prefbak backup routine script for machine '{}'".format(machineName))
 
+    logger.info("Loading this machine's prefbak config file: {}".format(backupConfigFilepath))
+    configData = mypycommons.file.readJsonFile(backupConfigFilepath)
 
+    # Change permission on the log file to whatever permissions are configured in the machine config file
+    # so that the user can read the log file (if the log file is created when running this script as
+    # sudo, it will not be readable by other users)
+    if (not runningWindowsOS):
+        logger.info("Setting the log file permissions to those set in the machine's config file")
+        logFilepath = mypycommons.file.JoinPaths(thisProjectLogsDir, logFilename)
+        backupDataPermissions = configData['backupDataPermissions']
+        mypycommons.file.applyPermissionToPath(path=logFilepath, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
 
+    # Run the prep script, if this is configured for the machine
+    if (configData['prepScript'] == 'true'):
+        if (runningWindowsOS):
+            prepScriptName = "backup-prep-{}.ps1".format(machineName)
+        else:
+            prepScriptName = "backup-prep-{}.sh".format(machineName)
 
-    # logger.info("Starting prefbak backup routine script for machine '{}'".format(machineName))
+        prepScriptFilepath = mypycommons.file.JoinPaths(thisProjectPrepScriptsDir, prepScriptName)
 
-    # logger.info("Loading this machine's prefbak config file: {}".format(backupConfigFilepath))
-    # configData = mypycommons.file.readJsonFile(backupConfigFilepath)
+        if (runningWindowsOS):
+            runArgs = [powershellExeFilepath, prepScriptFilepath]
+        else:
+            runArgs = [prepScriptFilepath]
 
-    # # Change permission on the log file to whatever permissions are configured in the machine config file
-    # # so that the user can read the log file (if the log file is created when running this script as
-    # # sudo, it will not be readable by other users)
-    # if (not runningWindowsOS):
-    #     logger.info("Setting the log file permissions to those set in the machine's config file")
-    #     logFilepath = mypycommons.file.JoinPaths(thisProjectLogsDir, logFilename)
-    #     backupDataPermissions = configData['backupDataPermissions']
-    #     mypycommons.file.applyPermissionToPath(path=logFilepath, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
-
-    # # Run the prep script, if this is configured for the machine
-    # if (configData['prepScript'] == 'true'):
-    #     if (runningWindowsOS):
-    #         prepScriptName = "backup-prep-{}.ps1".format(machineName)
-    #     else:
-    #         prepScriptName = "backup-prep-{}.sh".format(machineName)
-
-    #     prepScriptFilepath = mypycommons.file.JoinPaths(thisProjectPrepScriptsDir, prepScriptName)
-
-    #     if (runningWindowsOS):
-    #         runArgs = [powershellExeFilepath, prepScriptFilepath]
-    #     else:
-    #         runArgs = [prepScriptFilepath]
-
-    #     logger.info("Prep script configured for this machine: running script before doing the backup: {}".format(prepScriptFilepath))
-    #     subprocess.call(runArgs, shell=True)
-    #     logger.info("Prep script execution complete".format(prepScriptFilepath))
+        logger.info("Prep script configured for this machine: running script before doing the backup: {}".format(prepScriptFilepath))
+        subprocess.call(runArgs, shell=True)
+        logger.info("Prep script execution complete".format(prepScriptFilepath))
         
 
-    # logger.info("Beginning prefbak backup routine according to backup rules")
-    # performBackup(configData)
+    logger.info("Beginning prefbak backup routine according to backup rules")
+    performBackup(configData)
 
-    # logger.info("Backup routine completed successfully, script complete")
+    logger.info("Backup routine completed successfully, script complete")
 
 
 
