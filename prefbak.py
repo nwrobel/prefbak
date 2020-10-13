@@ -57,17 +57,25 @@ def getMostRecentArchiveFile(archivePartialFilename, archiveDir):
 
 def getFileHash(filepath):
     if (runningWindowsOS):
-        powershellCommand = "(Get-FileHash {} -Algorithm SHA256).Hash".format(filepath)
-        result = subprocess.run([powershellExeFilepath, powershellCommand], stdout=subprocess.PIPE)
-        hashString = result.stdout.decode('utf-8')
+        sevenZipCommand = sevenZipExeFilepath
     else:
-        result = subprocess.run(['sha256sum', filepath], stdout=subprocess.PIPE)
-        output = result.stdout.decode('utf-8')
-        hashString = output.split(" ")[0].strip()
+        sevenZipCommand = '7z'
 
-    return hashString.upper()
+    runArgs = [sevenZipCommand] + ['h', '-scrccrc32', filepath]
+    runResult = subprocess.run(runArgs, stdout=subprocess.PIPE)
+    
+    outputString = runResult.stdout.decode('utf-8')
+    outputLines = outputString.split('\n')
+    fileHash = ''
 
-def get7zArchiveItemsNameAndType(archiveFilepath):
+    for outputLine in outputLines:
+        if ("CRC32  for data:" in outputLine):
+            fileHash = outputLine.split(":")[1].strip()
+            break
+    
+    return fileHash.upper()
+
+def _getContentInfoFor7zArchive(archiveFilepath):
     if (runningWindowsOS):
         sevenZipCommand = sevenZipExeFilepath
     else:
@@ -80,58 +88,31 @@ def get7zArchiveItemsNameAndType(archiveFilepath):
     outputLines = output.split('\n')
     itemNameLines = fnmatch.filter(outputLines, 'Path = *')
     itemAttrLines = fnmatch.filter(outputLines, 'Attributes = *')
+    itemHashLines = fnmatch.filter(outputLines, 'CRC = *')
     
     archiveItemsNames = []
     for index, itemNameLine in enumerate(itemNameLines):
         itemName = itemNameLine.replace('Path = ', '')
         itemAttrs = itemAttrLines[index].replace('Attributes = ', '')
+        itemHash = itemHashLines[index].replace('CRC = ', '')
 
         if ('D_' in itemAttrs): 
             itemType = 'directory'
         else:
             itemType = 'file'
 
+        if (not itemHash):
+            itemHash = None
+
         archiveItemsNames.append({
             'pathName': itemName,
-            'type': itemType
+            'type': itemType,
+            'hash': itemHash
         })
 
     return archiveItemsNames
     
-def get7zArchiveItemHash(archiveFilepath, archiveItemName):
-    if (runningWindowsOS):
-        sevenZipCommand = sevenZipExeFilepath
-    else:
-        sevenZipCommand = '7z'
-
-    runArgs = [sevenZipCommand] + ['t', '-scrcsha256', archiveFilepath, archiveItemName]
-    runResult = subprocess.run(runArgs, stdout=subprocess.PIPE)
-
-    output = runResult.stdout.decode('utf-8')
-    itemHash = output.split('SHA256 for data:')[1].strip()
-
-    return itemHash
-
-def _getContentChecksumInfoFor7zArchive(archiveFilepath):
-    archiveItemsNameAndType = get7zArchiveItemsNameAndType(archiveFilepath)
-    archiveContentInfo = []
-
-    for item in archiveItemsNameAndType:
-        if (item['type'] == 'file'):
-            itemHash = get7zArchiveItemHash(archiveFilepath, item['pathName'])
-        else:
-            itemHash = None
-
-        itemInfo = {
-            'pathName': item['pathName'],
-            'type': item['type'],
-            'hash': itemHash
-        }
-        archiveContentInfo.append(itemInfo)
-    
-    return archiveContentInfo
-
-def _getContentChecksumInfoForPath(filepath):
+def _getContentInfoForPath(filepath):
     allItemsPaths = mypycommons.file.GetAllFilesAndDirectoriesRecursive(rootPath=filepath)
     allItemsPaths += [filepath]
 
@@ -168,15 +149,11 @@ def _getContentChecksumInfoForPath(filepath):
     return pathContentsInfo
     
 def sourceDataMatchesExistingArchive(sourcePath, archiveFilepath):
-    archiveFileInfo = _getContentChecksumInfoFor7zArchive(archiveFilepath)
-    pathFileInfo = _getContentChecksumInfoForPath(sourcePath)
+    archiveFileInfo = _getContentInfoFor7zArchive(archiveFilepath)
+    pathFileInfo = _getContentInfoForPath(sourcePath)
 
     archiveFileInfoSorted = sorted(archiveFileInfo, key=lambda k: k['pathName']) 
     pathFileInfoSorted = sorted(pathFileInfo, key=lambda k: k['pathName']) 
-
-    # print(archiveFileInfoSorted)
-    # print()
-    # print(pathFileInfoSorted)
 
     if (archiveFileInfoSorted == pathFileInfoSorted):
         return True
@@ -224,7 +201,6 @@ def performBackupStep(sourcePath, destinationPath):
 
     if (mostRecentArchiveFile and sourceDataMatchesExistingArchive(sourcePath, mostRecentArchiveFile)):
         logger.info("An archive with the same data as the source already exists in the destination: no new backup archive will be created")
-
     else:
         logger.info("Latest archive doesn't exist or doesn't contain the latest source data: a new backup archive will be created")
 
@@ -301,13 +277,22 @@ if __name__ == "__main__":
     # x = get7zArchiveItemHash('/datastore/nick/Temp/archive3.7z', 'test')
     # print(x)
 
-    # x = get7zArchiveContentInfo('/datastore/nick/Temp/archive2.7z')
+    # logger.info("started")
+    # x = _getContentChecksumInfoFor7zArchive('/datastore/nick/Device & App Backups/zinc-test/AppData/piwigo/[2020-10-12 03_48_33] piwigo.archive.tar.7z')
+    # print(x)
+    # logger.info("finished")
+
+    # x = getFileHash('/datastore/nick/Temp/archive5.7z')
     # print(x)
 
+    # x = _getContentInfoFor7zArchive('/datastore/nick/Temp/archive2.7z')
+    # print(x)
 
-    # y = sourceDataMatchesExistingArchive('/home/nick/.vimrc', '/datastore/nick/Temp/archive5.7z')
+    # x = _getContentInfoForPath('/home/nick/.vim')
+    # print(x)
+
+    # y = sourceDataMatchesExistingArchive('/etc/mpd.conf', '/datastore/nick/Temp/mpd.conf.7z')
     # print(y)
-
 
     # create7zArchive('/home/nick/.vim', '/datastore/nick/Temp/archive10.7z')
 
