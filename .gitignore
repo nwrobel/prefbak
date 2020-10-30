@@ -1,4 +1,5 @@
 __pycache__
+.vscode
 ~cache
 ~logs
 machine-backup-prep-scripts/*

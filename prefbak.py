@@ -9,6 +9,8 @@ import glob
 import os
 import socket
 import fnmatch
+import collections
+
 
 
 from com.nwrobel import mypycommons
@@ -90,13 +92,13 @@ def _getContentInfoFor7zArchive(archiveFilepath):
     itemAttrLines = fnmatch.filter(outputLines, 'Attributes = *')
     itemHashLines = fnmatch.filter(outputLines, 'CRC = *')
     
-    archiveItemsNames = []
+    archiveContentsInfo = []
     for index, itemNameLine in enumerate(itemNameLines):
-        itemName = itemNameLine.replace('Path = ', '')
-        itemAttrs = itemAttrLines[index].replace('Attributes = ', '')
-        itemHash = itemHashLines[index].replace('CRC = ', '')
+        itemName = itemNameLine.replace('Path = ', '').strip()
+        itemAttrs = itemAttrLines[index].replace('Attributes = ', '').strip()
+        itemHash = itemHashLines[index].replace('CRC = ', '').strip()
 
-        if ('D_' in itemAttrs): 
+        if ('D' in itemAttrs): 
             itemType = 'directory'
         else:
             itemType = 'file'
@@ -104,32 +106,35 @@ def _getContentInfoFor7zArchive(archiveFilepath):
         if (not itemHash):
             itemHash = None
 
-        archiveItemsNames.append({
+        archiveContentsInfo.append({
             'pathName': itemName,
             'type': itemType,
             'hash': itemHash
         })
 
-    return archiveItemsNames
-    
-def _getContentInfoForPath(filepath):
-    allItemsPaths = mypycommons.file.GetAllFilesAndDirectoriesRecursive(rootPath=filepath)
-    allItemsPaths += [filepath]
+    return archiveContentsInfo
 
-    baseFilename = mypycommons.file.GetFilename(filepath)
-    trimThisFromPaths = filepath.replace(baseFilename, '')
+
+def _getContentInfoForPath(filepath):
+    allItemsPaths = mypycommons.file.GetAllFilesAndDirectoriesRecursive(rootPath=filepath, includeRootPath=True)
+    rootItemParentDir = mypycommons.file.getParentDirectory(filepath)
+    
+    if (runningWindowsOS):
+        replaceThisInPath = rootItemParentDir + "\\"
+    else:
+        replaceThisInPath = rootItemParentDir + "/"
 
     itemRelativePaths = []
     for itemPath in allItemsPaths:
-        relativePath = itemPath.replace(trimThisFromPaths, '')
+        relativePath = itemPath.replace(replaceThisInPath, '')
         itemRelativePaths.append(relativePath)
 
     itemRelativePaths.sort()
 
     pathContentsInfo = []
     for itemRelativePath in itemRelativePaths:
-        itemAbsolutePath = trimThisFromPaths + itemRelativePath
-        
+        itemAbsolutePath = replaceThisInPath + itemRelativePath
+
         if (mypycommons.file.fileExists(itemAbsolutePath)):
             itemType = 'file'
             itemHash = getFileHash(itemAbsolutePath)
@@ -147,7 +152,99 @@ def _getContentInfoForPath(filepath):
         pathContentsInfo.append(itemInfo)
 
     return pathContentsInfo
+
+# def getContentInfoDifferencesBetweenPathAndArchive(archiveFileInfo, pathFileInfo):
     
+#     noMatchingPathInfoDictsForArchiveInfoDicts = []
+#     noMatchingArchiveInfoDictsForPathInfoDicts = []
+
+#     for archiveInfoDict in archiveFileInfo:
+#         archiveInfoDictPathName = archiveInfoDict['pathName']
+#         archiveInfoDictType = archiveInfoDict['type']
+#         archiveInfoDictHash = archiveInfoDict['hash']
+
+#         # look for a dict with this pathName in the pathFileInfo values
+#         foundMatchForArchiveInfoDict = False
+#         for pathFileInfoDict in pathFileInfo:
+#             if (pathFileInfoDict['pathName'] == archiveInfoDictPathName and
+#                 pathFileInfoDict['type'] == archiveInfoDictType and
+#                 pathFileInfoDict['hash'] == archiveInfoDictHash):
+#                     foundMatchForArchiveInfoDict = True
+#                     break
+
+#         if (not foundMatchForArchiveInfoDict):
+#             noMatchingPathInfoDictsForArchiveInfoDicts.append(archiveInfoDict)
+
+#     for pathInfoDict in pathFileInfo:
+#         pathInfoDictPathName = pathInfoDict['pathName']
+#         pathInfoDictType = pathInfoDict['type']
+#         pathInfoDictHash = pathInfoDict['hash']
+
+#         # look for a dict with this pathName in the pathFileInfo values
+#         foundMatchForPathInfoDict = False
+#         for archiveFileInfoDict in archiveFileInfo:
+#             if (archiveFileInfoDict['pathName'] == pathInfoDictPathName and
+#                 archiveFileInfoDict['type'] == pathInfoDictType and
+#                 archiveFileInfoDict['hash'] == pathInfoDictHash):
+#                     foundMatchForPathInfoDict = True
+#                     break
+
+#         if (not foundMatchForPathInfoDict):
+#             noMatchingArchiveInfoDictsForPathInfoDicts.append(archiveInfoDict)
+
+#     return (noMatchingPathInfoDictsForArchiveInfoDicts + noMatchingArchiveInfoDictsForPathInfoDicts)
+
+def getDuplicatedValuesWithinList(inputList):
+    return [item for item, count in collections.Counter(inputList).items() if count > 1]
+
+def getContentInfoDifferencesBetweenPathAndArchive(archiveFileInfo, pathFileInfo):
+    
+    inArchiveOnly = []
+    inPathOnly = []
+
+    for archiveInfoDict in archiveFileInfo:
+
+        # look for a dict with this pathName in the pathFileInfo values
+        foundMatchForArchiveInfoDict = False
+        for pathFileInfoDict in pathFileInfo:
+            if (pathFileInfoDict == archiveInfoDict):
+                foundMatchForArchiveInfoDict = True
+                    #break
+
+        if (not foundMatchForArchiveInfoDict):
+            inArchiveOnly.append(archiveInfoDict)
+
+    for pathInfoDict in pathFileInfo:
+
+        # look for a dict with this pathName in the pathFileInfo values
+        foundMatchForPathInfoDict = False
+        for archiveFileInfoDict in archiveFileInfo:
+            if (archiveFileInfoDict == pathInfoDict):
+                foundMatchForPathInfoDict = True
+                    #break
+
+        if (not foundMatchForPathInfoDict):
+            inPathOnly.append(pathInfoDict)
+
+    allContentInfoDiffs = inArchiveOnly + inPathOnly
+    allContentInfoDiffsPathNames = [contentInfo['pathName'] for contentInfo in allContentInfoDiffs]
+    dupePathNames = getDuplicatedValuesWithinList(allContentInfoDiffsPathNames)
+
+    contentInfoDiffGroups = []
+    for pathName in dupePathNames:
+        contentInfoDiffGroup = [contentInfo for contentInfo in allContentInfoDiffs if (contentInfo['pathName'] == pathName)]
+        contentInfoDiffGroups.append(contentInfoDiffGroup)
+
+    inArchiveOnly = list(filter(lambda i: i['pathName'] not in dupePathNames, inArchiveOnly))
+    inPathOnly = list(filter(lambda i: i['pathName'] not in dupePathNames, inPathOnly))
+ 
+    return {
+        'archiveOnly': inArchiveOnly,
+        'pathOnly': inPathOnly,
+        'bothWithHashDiff': contentInfoDiffGroups
+    }
+
+
 def sourceDataMatchesExistingArchive(sourcePath, archiveFilepath):
     archiveFileInfo = _getContentInfoFor7zArchive(archiveFilepath)
     pathFileInfo = _getContentInfoForPath(sourcePath)
@@ -156,10 +253,52 @@ def sourceDataMatchesExistingArchive(sourcePath, archiveFilepath):
     pathFileInfoSorted = sorted(pathFileInfo, key=lambda k: k['pathName']) 
 
     if (archiveFileInfoSorted == pathFileInfoSorted):
+        logger.info("Archive backup data matches all data in the source")
         return True
     else:
+        diffContentInfoData = getContentInfoDifferencesBetweenPathAndArchive(archiveFileInfoSorted, pathFileInfoSorted)
+
+        outStrGroups = []
+        for group in diffContentInfoData['bothWithHashDiff']:
+            outStrGroups.append('< File Group > ------------------')
+            outStrGroups.append(contentInfoToString(group))
+            outStrGroups.append('</ File Group >')
+
+        outStrGroups = '\n'.join(outStrGroups)
+
+        logger.info("""
+        Archive backup data is different from data in the source: the following differences are present:\n\n
+        These items are in the archive only:\n
+        {}\n\n
+        These items are in the source path only:\n
+        {}\n\n
+        These items are in both the source and the archive, but differ in file hash:\n
+        {}\n\n
+        """.format(
+            contentInfoToString(diffContentInfoData['archiveOnly']), 
+            contentInfoToString(diffContentInfoData['pathOnly']), 
+            outStrGroups
+        ))
+
         return False
-            
+
+def contentInfoToString(contentInfoData):
+
+    outStrParts = []
+    for contentInfo in contentInfoData:
+        itemStr = """
+        < File > --------------
+            Path: {}
+            Type: {}
+            Hash: {}
+        </ File >
+        """.format(contentInfo['pathName'], contentInfo['type'], contentInfo['hash'])
+
+        outStrParts.append(itemStr)
+
+    outStr = '\n'.join(outStrParts)
+    return outStr
+
 def getThisMachineName():
     return socket.gethostname()
 
@@ -221,7 +360,6 @@ def performBackup(configData):
     Params:
         configFile: the Json prefbak config file
     '''
-    backupDataPermissions = configData['backupDataPermissions']
     backupRules = configData['backupRules']
 
     for backupRule in backupRules:
@@ -234,6 +372,7 @@ def performBackup(configData):
         # Set the permissions on the destination path and the archive file within so that the user can read the backup
         if (not runningWindowsOS):
             logger.info("Updating file permissions for backup destination directory {}".format(destinationPath))
+            backupDataPermissions = configData['backupDataPermissions']
             mypycommons.file.applyPermissionToPath(path=destinationPath, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'], recursive=True)
 
 
@@ -267,35 +406,6 @@ if __name__ == "__main__":
     backupConfigName = '{}.config.json'.format(machineName)
     backupConfigFilepath = mypycommons.file.JoinPaths(thisProjectConfigDir, backupConfigName)
 
-    # x = getFileHash('/datastore/nick/Temp/archive.tar')
-    # print(x)
-    # x = getFileHash('/datastore/nick/Temp/archive2.tar')
-    # print(x)
-
-    # x= get7zArchiveItemsNameAndType('/datastore/nick/Temp/archive3.7z')
-    # print(x)
-    # x = get7zArchiveItemHash('/datastore/nick/Temp/archive3.7z', 'test')
-    # print(x)
-
-    # logger.info("started")
-    # x = _getContentChecksumInfoFor7zArchive('/datastore/nick/Device & App Backups/zinc-test/AppData/piwigo/[2020-10-12 03_48_33] piwigo.archive.tar.7z')
-    # print(x)
-    # logger.info("finished")
-
-    # x = getFileHash('/datastore/nick/Temp/archive5.7z')
-    # print(x)
-
-    # x = _getContentInfoFor7zArchive('/datastore/nick/Temp/archive2.7z')
-    # print(x)
-
-    # x = _getContentInfoForPath('/home/nick/.vim')
-    # print(x)
-
-    # y = sourceDataMatchesExistingArchive('/etc/mpd.conf', '/datastore/nick/Temp/mpd.conf.7z')
-    # print(y)
-
-    # create7zArchive('/home/nick/.vim', '/datastore/nick/Temp/archive10.7z')
-
     logger.info("Starting prefbak backup routine script for machine '{}'".format(machineName))
 
     logger.info("Loading this machine's prefbak config file: {}".format(backupConfigFilepath))
@@ -328,7 +438,6 @@ if __name__ == "__main__":
         subprocess.call(runArgs, shell=True)
         logger.info("Prep script execution complete".format(prepScriptFilepath))
         
-
     logger.info("Beginning prefbak backup routine according to backup rules")
     performBackup(configData)
 

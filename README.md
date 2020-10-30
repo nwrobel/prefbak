@@ -21,7 +21,7 @@ This tool can be configured to perform backups for one or more machines. Files t
 See the example template backup config file `yourMachineName.config.json`, included by default with the project, for reference on how to structure the JSON file.
 
 "backupRootDir" - destination root directory for the file backups for this machine (recommended to place this on a NAS or external drive)
-"backupDataPermissions" - file permissions that the backup files, stored in backupRootDir, should be set to, so that they can be accessed
+"backupDataPermissions" - file permissions that the backup files, stored in backupRootDir, should be set to so that they can be accessed - do not include this value(s) if backing up a Windows system
 "backupRules" - array of rules, each one has 2 values: "sourcePath" for the path of the source file or directory on the machine, and "backupPath" for the path of where the backup of the source path should be stored within the backupRootDir
 
 ## Use
