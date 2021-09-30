@@ -420,23 +420,23 @@ if __name__ == "__main__":
         backupDataPermissions = configData['backupDataPermissions']
         mypycommons.file.applyPermissionToPath(path=logFilepath, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
 
-    # Run the prep script, if this is configured for the machine
-    if (configData['prepScript'] == 'true'):
-        if (runningWindowsOS):
-            prepScriptName = "backup-prep-{}.ps1".format(machineName)
-        else:
-            prepScriptName = "backup-prep-{}.sh".format(machineName)
+    # # Run the prep script, if this is configured for the machine
+    # if (configData['prepScript'] == 'true'):
+    #     if (runningWindowsOS):
+    #         prepScriptName = "backup-prep-{}.ps1".format(machineName)
+    #     else:
+    #         prepScriptName = "backup-prep-{}.sh".format(machineName)
 
-        prepScriptFilepath = mypycommons.file.JoinPaths(thisProjectPrepScriptsDir, prepScriptName)
+    #     prepScriptFilepath = mypycommons.file.JoinPaths(thisProjectPrepScriptsDir, prepScriptName)
 
-        if (runningWindowsOS):
-            runArgs = [powershellExeFilepath, prepScriptFilepath]
-        else:
-            runArgs = [prepScriptFilepath]
+    #     if (runningWindowsOS):
+    #         runArgs = [powershellExeFilepath, prepScriptFilepath]
+    #     else:
+    #         runArgs = [prepScriptFilepath]
 
-        logger.info("Prep script configured for this machine: running script before doing the backup: {}".format(prepScriptFilepath))
-        subprocess.call(runArgs, shell=True)
-        logger.info("Prep script execution complete".format(prepScriptFilepath))
+    #     logger.info("Prep script configured for this machine: running script before doing the backup: {}".format(prepScriptFilepath))
+    #     subprocess.call(runArgs, shell=True)
+    #     logger.info("Prep script execution complete".format(prepScriptFilepath))
         
     logger.info("Beginning prefbak backup routine according to backup rules")
     performBackup(configData)

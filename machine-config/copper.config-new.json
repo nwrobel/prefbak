@@ -1,0 +1,203 @@
+{
+    "rules": [
+        {
+            "name": "foobar2000",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/Users/nick/AppData/Roaming/foobar2000",
+                    "destination": "Z:/Device & App Backups/copper/AppData/foobar2000",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "startMenu",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/ProgramData/Microsoft/Windows/Start Menu",
+                    "destination": "Z:/Device & App Backups/copper/AppData/Start Menu",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "greenshot",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/Users/nick/AppData/Roaming/Greenshot/Greenshot.ini",
+                    "destination": "Z:/Device & App Backups/copper/AppData/Greenshot",
+                    "compress": "n"
+                }
+            ]
+        },
+        {
+            "name": "musicBrainz",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/Users/nick/AppData/Roaming/MusicBrainz",
+                    "destination": "Z:/Device & App Backups/copper/AppData/MusicBrainz",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "notepad++",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/Users/nick/AppData/Roaming/Notepad++",
+                    "destination": "Z:/Device & App Backups/copper/AppData/Notepad++",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "scanSnap",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/Users/nick/AppData/Roaming/PFU/ScanSnap",
+                    "destination": "Z:/Device & App Backups/copper/AppData/ScanSnap",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "vsCode",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/Users/nick/AppData/Roaming/Code/User/settings.json",
+                    "destination": "Z:/Device & App Backups/copper/AppData/VSCode",
+                    "compress": "n"
+                }
+            ]
+        },
+        {
+            "name": "everything",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/Users/nick/AppData/Roaming/Everything/Everything.ini",
+                    "destination": "Z:/Device & App Backups/copper/AppData/Everything",
+                    "compress": "n"
+                }
+            ]
+        },
+        {
+            "name": "ableton",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "D:/VM-Shared/armorbox/Ableton/My Work",
+                    "destination": "Z:/Device & App Backups/copper/AppData/Ableton",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "openKeyDb",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "D:/Dropbox/open",
+                    "destination": "Z:/Secrets/open-dropbox-bak",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "vm-lithium",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "D:/VM-Store/lithium",
+                    "destination": "Z:/Device & App Backups/lithium/System Images",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "vm-silicon",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "D:/VM-Store/silicon",
+                    "destination": "Z:/Device & App Backups/silicon/System Images",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "vm-armorbox",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "D:/VM-Store/armorbox",
+                    "destination": "Z:/Device & App Backups/armorbox/System Images",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "vm-ubuntu-18.04",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "D:/VM-Store/ubuntu-18.04",
+                    "destination": "Z:/Device & App Backups/ubuntu-18.04/System Images",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "dev-mlu",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/nick-local-data/local-dev/mlYou",
+                    "destination": "Z:/Development/Projects/mlYou",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "dev-mlstream",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/nick-local-data/local-dev/mlStream",
+                    "destination": "Z:/Development/Projects/mlStream",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "dev-my-python-commons",
+            "initScript": "",
+            "files": [
+                {
+                    "source": "C:/nick-local-data/local-dev/my-python-commons",
+                    "destination": "Z:/Development/Projects/my-python-commons",
+                    "compress": "y"
+                }
+            ]
+        },
+        {
+            "name": "gDrive",
+            "initScript": "copper/CopperBackupInit-GDrive.ps1",
+            "files": [
+                {
+                    "source": "C:/nick-local-data/local-dev/my-python-commons",
+                    "destination": "Z:/Development/Projects/my-python-commons",
+                    "compress": "y"
+                }
+            ]
+        }
+    ]
+}
+

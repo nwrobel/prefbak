@@ -1,8 +1,8 @@
 {
-    "backupRootDir":"/machine/backups/root/dir",
+    "prepScript": "true",
     "backupDataPermissions": {
-        "owner": "tommy",
-        "group": "tommy",
+        "owner": "nick",
+        "group": "nick",
         "mask": "700"
     },
     "backupRules": [
