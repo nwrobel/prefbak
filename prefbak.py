@@ -3,321 +3,59 @@ Script that performs a "prefbak" routine: that is, performs a backup of a machin
 backup rules defined in that machine's prefbak config file.
 '''
 
+import logging
 import subprocess
-import tarfile
-import glob
-import os
-import socket
-import fnmatch
-import collections
-
-
+import argparse
+import sys
 
 from com.nwrobel import mypycommons
 import com.nwrobel.mypycommons.file
 import com.nwrobel.mypycommons.time
 import com.nwrobel.mypycommons.logger
+import com.nwrobel.mypycommons.system
+import com.nwrobel.mypycommons.archive
+
+# Setup logging for this entire module/script
+logger = logging.getLogger(__name__)
 
 # Module-wide global variables, used by many of the helper functions below
-archiveFileNameSuffix = ".archive.7z"
-runningWindowsOS = False
-sevenZipExeFilepath = ''
-powershellExeFilepath = ''
+archiveFileNameSuffix = "backup"
+powershellExeFilepath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
 
 # ----------------------------- Script helper functions --------------------------------------------
 def getProjectLogsDir():
     currentDir = mypycommons.file.getThisScriptCurrentDirectory()
-    logsDir = mypycommons.file.JoinPaths(currentDir, '~logs')
+    logsDir = mypycommons.file.joinPaths(currentDir, '~logs')
 
-    if (not mypycommons.file.directoryExists(logsDir)):
+    if (not mypycommons.file.pathExists(logsDir)):
         mypycommons.file.createDirectory(logsDir)
     
     return logsDir
 
 def getProjectCacheDir():
     currentDir = mypycommons.file.getThisScriptCurrentDirectory()
-    cacheDir = mypycommons.file.JoinPaths(currentDir, '~cache')
+    cacheDir = mypycommons.file.joinPaths(currentDir, '~cache')
 
-    if (not mypycommons.file.directoryExists(cacheDir)):
+    if (not mypycommons.file.pathExists(cacheDir)):
         mypycommons.file.createDirectory(cacheDir)
     
     return cacheDir
 
-def getMostRecentArchiveFile(archivePartialFilename, archiveDir):
-    fileSearchPattern = mypycommons.file.JoinPaths(
-        archiveDir, 
-        ('*' + archivePartialFilename + archiveFileNameSuffix)
-    )
-    allArchiveFiles = glob.glob(fileSearchPattern)
+def runScript(scriptFilepath):
+    if (not mypycommons.file.pathExists(scriptFilepath)):
+        raise FileNotFoundError("Error: The script '{}' does not exist".format(scriptFilepath))
 
-    if (allArchiveFiles):
-        mostRecentFile = max(allArchiveFiles, key=os.path.getmtime)
-    else:
-        mostRecentFile = None
-
-    return mostRecentFile
-
-def getFileHash(filepath):
     if (runningWindowsOS):
-        sevenZipCommand = sevenZipExeFilepath
+        runArgs = [powershellExeFilepath, scriptFilepath]
     else:
-        sevenZipCommand = '7z'
+        runArgs = [scriptFilepath]
 
-    runArgs = [sevenZipCommand] + ['h', '-scrccrc32', filepath]
-    runResult = subprocess.run(runArgs, stdout=subprocess.PIPE)
-    
-    outputString = runResult.stdout.decode('utf-8')
-    outputLines = outputString.split('\n')
-    fileHash = ''
-
-    for outputLine in outputLines:
-        if ("CRC32  for data:" in outputLine):
-            fileHash = outputLine.split(":")[1].strip()
-            break
-    
-    return fileHash.upper()
-
-def _getContentInfoFor7zArchive(archiveFilepath):
-    if (runningWindowsOS):
-        sevenZipCommand = sevenZipExeFilepath
-    else:
-        sevenZipCommand = '7z'
-
-    runArgs = [sevenZipCommand] + ['l', '-slt', '-ba', archiveFilepath]
-    runResult = subprocess.run(runArgs, stdout=subprocess.PIPE)
-    
-    output = runResult.stdout.decode('utf-8')
-    outputLines = output.split('\n')
-    itemNameLines = fnmatch.filter(outputLines, 'Path = *')
-    itemAttrLines = fnmatch.filter(outputLines, 'Attributes = *')
-    itemHashLines = fnmatch.filter(outputLines, 'CRC = *')
-    
-    archiveContentsInfo = []
-    for index, itemNameLine in enumerate(itemNameLines):
-        itemName = itemNameLine.replace('Path = ', '').strip()
-        itemAttrs = itemAttrLines[index].replace('Attributes = ', '').strip()
-        itemHash = itemHashLines[index].replace('CRC = ', '').strip()
-
-        if ('D' in itemAttrs): 
-            itemType = 'directory'
-        else:
-            itemType = 'file'
-
-        if (not itemHash):
-            itemHash = None
-
-        archiveContentsInfo.append({
-            'pathName': itemName,
-            'type': itemType,
-            'hash': itemHash
-        })
-
-    return archiveContentsInfo
+    logger.info("Starting script: '{}'".format(scriptFilepath))
+    subprocess.call(runArgs, shell=True)
+    logger.info("Script execution complete")
 
 
-def _getContentInfoForPath(filepath):
-    allItemsPaths = mypycommons.file.GetAllFilesAndDirectoriesRecursive(rootPath=filepath, includeRootPath=True)
-    rootItemParentDir = mypycommons.file.getParentDirectory(filepath)
-    
-    if (runningWindowsOS):
-        replaceThisInPath = rootItemParentDir + "\\"
-    else:
-        replaceThisInPath = rootItemParentDir + "/"
-
-    itemRelativePaths = []
-    for itemPath in allItemsPaths:
-        relativePath = itemPath.replace(replaceThisInPath, '')
-        itemRelativePaths.append(relativePath)
-
-    itemRelativePaths.sort()
-
-    pathContentsInfo = []
-    for itemRelativePath in itemRelativePaths:
-        itemAbsolutePath = replaceThisInPath + itemRelativePath
-
-        if (mypycommons.file.fileExists(itemAbsolutePath)):
-            itemType = 'file'
-            itemHash = getFileHash(itemAbsolutePath)
-        elif (mypycommons.file.directoryExists(itemAbsolutePath)):
-            itemType = 'directory'
-            itemHash = None
-        else:
-            raise "Error: the given path does not exist: {}".format(itemAbsolutePath)
-        
-        itemInfo = {
-            'pathName': itemRelativePath,
-            'type': itemType,
-            'hash': itemHash
-        }
-        pathContentsInfo.append(itemInfo)
-
-    return pathContentsInfo
-
-# def getContentInfoDifferencesBetweenPathAndArchive(archiveFileInfo, pathFileInfo):
-    
-#     noMatchingPathInfoDictsForArchiveInfoDicts = []
-#     noMatchingArchiveInfoDictsForPathInfoDicts = []
-
-#     for archiveInfoDict in archiveFileInfo:
-#         archiveInfoDictPathName = archiveInfoDict['pathName']
-#         archiveInfoDictType = archiveInfoDict['type']
-#         archiveInfoDictHash = archiveInfoDict['hash']
-
-#         # look for a dict with this pathName in the pathFileInfo values
-#         foundMatchForArchiveInfoDict = False
-#         for pathFileInfoDict in pathFileInfo:
-#             if (pathFileInfoDict['pathName'] == archiveInfoDictPathName and
-#                 pathFileInfoDict['type'] == archiveInfoDictType and
-#                 pathFileInfoDict['hash'] == archiveInfoDictHash):
-#                     foundMatchForArchiveInfoDict = True
-#                     break
-
-#         if (not foundMatchForArchiveInfoDict):
-#             noMatchingPathInfoDictsForArchiveInfoDicts.append(archiveInfoDict)
-
-#     for pathInfoDict in pathFileInfo:
-#         pathInfoDictPathName = pathInfoDict['pathName']
-#         pathInfoDictType = pathInfoDict['type']
-#         pathInfoDictHash = pathInfoDict['hash']
-
-#         # look for a dict with this pathName in the pathFileInfo values
-#         foundMatchForPathInfoDict = False
-#         for archiveFileInfoDict in archiveFileInfo:
-#             if (archiveFileInfoDict['pathName'] == pathInfoDictPathName and
-#                 archiveFileInfoDict['type'] == pathInfoDictType and
-#                 archiveFileInfoDict['hash'] == pathInfoDictHash):
-#                     foundMatchForPathInfoDict = True
-#                     break
-
-#         if (not foundMatchForPathInfoDict):
-#             noMatchingArchiveInfoDictsForPathInfoDicts.append(archiveInfoDict)
-
-#     return (noMatchingPathInfoDictsForArchiveInfoDicts + noMatchingArchiveInfoDictsForPathInfoDicts)
-
-def getDuplicatedValuesWithinList(inputList):
-    return [item for item, count in collections.Counter(inputList).items() if count > 1]
-
-def getContentInfoDifferencesBetweenPathAndArchive(archiveFileInfo, pathFileInfo):
-    
-    inArchiveOnly = []
-    inPathOnly = []
-
-    for archiveInfoDict in archiveFileInfo:
-
-        # look for a dict with this pathName in the pathFileInfo values
-        foundMatchForArchiveInfoDict = False
-        for pathFileInfoDict in pathFileInfo:
-            if (pathFileInfoDict == archiveInfoDict):
-                foundMatchForArchiveInfoDict = True
-                    #break
-
-        if (not foundMatchForArchiveInfoDict):
-            inArchiveOnly.append(archiveInfoDict)
-
-    for pathInfoDict in pathFileInfo:
-
-        # look for a dict with this pathName in the pathFileInfo values
-        foundMatchForPathInfoDict = False
-        for archiveFileInfoDict in archiveFileInfo:
-            if (archiveFileInfoDict == pathInfoDict):
-                foundMatchForPathInfoDict = True
-                    #break
-
-        if (not foundMatchForPathInfoDict):
-            inPathOnly.append(pathInfoDict)
-
-    allContentInfoDiffs = inArchiveOnly + inPathOnly
-    allContentInfoDiffsPathNames = [contentInfo['pathName'] for contentInfo in allContentInfoDiffs]
-    dupePathNames = getDuplicatedValuesWithinList(allContentInfoDiffsPathNames)
-
-    contentInfoDiffGroups = []
-    for pathName in dupePathNames:
-        contentInfoDiffGroup = [contentInfo for contentInfo in allContentInfoDiffs if (contentInfo['pathName'] == pathName)]
-        contentInfoDiffGroups.append(contentInfoDiffGroup)
-
-    inArchiveOnly = list(filter(lambda i: i['pathName'] not in dupePathNames, inArchiveOnly))
-    inPathOnly = list(filter(lambda i: i['pathName'] not in dupePathNames, inPathOnly))
- 
-    return {
-        'archiveOnly': inArchiveOnly,
-        'pathOnly': inPathOnly,
-        'bothWithHashDiff': contentInfoDiffGroups
-    }
-
-
-def sourceDataMatchesExistingArchive(sourcePath, archiveFilepath):
-    archiveFileInfo = _getContentInfoFor7zArchive(archiveFilepath)
-    pathFileInfo = _getContentInfoForPath(sourcePath)
-
-    archiveFileInfoSorted = sorted(archiveFileInfo, key=lambda k: k['pathName']) 
-    pathFileInfoSorted = sorted(pathFileInfo, key=lambda k: k['pathName']) 
-
-    if (archiveFileInfoSorted == pathFileInfoSorted):
-        logger.info("Archive backup data matches all data in the source")
-        return True
-    else:
-        diffContentInfoData = getContentInfoDifferencesBetweenPathAndArchive(archiveFileInfoSorted, pathFileInfoSorted)
-
-        outStrGroups = []
-        for group in diffContentInfoData['bothWithHashDiff']:
-            outStrGroups.append('< File Group > ------------------')
-            outStrGroups.append(contentInfoToString(group))
-            outStrGroups.append('</ File Group >')
-
-        outStrGroups = '\n'.join(outStrGroups)
-
-        logger.info("""
-        Archive backup data is different from data in the source: the following differences are present:\n\n
-        These items are in the archive only:\n
-        {}\n\n
-        These items are in the source path only:\n
-        {}\n\n
-        These items are in both the source and the archive, but differ in file hash:\n
-        {}\n\n
-        """.format(
-            contentInfoToString(diffContentInfoData['archiveOnly']), 
-            contentInfoToString(diffContentInfoData['pathOnly']), 
-            outStrGroups
-        ))
-
-        return False
-
-def contentInfoToString(contentInfoData):
-
-    outStrParts = []
-    for contentInfo in contentInfoData:
-        itemStr = """
-        < File > --------------
-            Path: {}
-            Type: {}
-            Hash: {}
-        </ File >
-        """.format(contentInfo['pathName'], contentInfo['type'], contentInfo['hash'])
-
-        outStrParts.append(itemStr)
-
-    outStr = '\n'.join(outStrParts)
-    return outStr
-
-def getThisMachineName():
-    return socket.gethostname()
-
-def thisMachineIsWindowsOS():
-    if (os.name == 'nt'):
-        return True
-    else:
-        return False
-
-def create7zArchive(sourcePath, archiveFilepath):
-    if (runningWindowsOS):
-        sevenZipCommand = sevenZipExeFilepath
-    else:
-        sevenZipCommand = '7z'
-
-    runArgs = [sevenZipCommand] + ['a', '-t7z', '-mx=9', '-mfb=64', '-md=64m', archiveFilepath, sourcePath]
-    subprocess.call(runArgs)    
-
-def performBackupStep(sourcePath, destinationPath):
+def performFileBackupStep(sourcePath, destinationDir):
     '''
     Performs a single backup operation. Files can either be mirrored/copied from the source path to 
     the destination path, or an archive file at the destination path can be made from the source
@@ -325,123 +63,182 @@ def performBackupStep(sourcePath, destinationPath):
 
     Params:
         sourcePath: single filepath (file or directory) to use as the backup source
-        destinationPath: single filepath (file or directory) to use as the destination/backup 
+        destinationDir: destination dir to use as the destination/backup 
             location. Use the name of the archive file if also using the 'compress' param
     '''
-    if (not mypycommons.file.directoryExists(destinationPath)):
-        logger.info("Backup destination path '{}' does not exist: creating it".format(destinationPath))
-        mypycommons.file.createDirectory(destinationPath)
+    if (not mypycommons.file.pathExists(destinationDir)):
+        logger.info("Backup destination directory '{}' does not exist: creating it".format(destinationDir))
+        mypycommons.file.createDirectory(destinationDir)
 
-    mostRecentArchiveFile = getMostRecentArchiveFile(archivePartialFilename=mypycommons.file.GetFilename(sourcePath), archiveDir=destinationPath)
-    if (mostRecentArchiveFile):
-        logger.info("Pre-scan found the latest pre-existing archive file of the source path in this destination dir: {}".format(mostRecentArchiveFile))
+    currentTimestampStr = mypycommons.time.getCurrentTimestampForFilename()
+    baseArchiveFilename = mypycommons.file.getFilename(sourcePath)
+    archiveName = ''
+    sourcePathFinal = ''
+
+    # If we aren't running Windows, we want to use the 'tar' command, available on non-win systems
+    if (not runningWindowsOS):
+        tarArchiveName = '{} {}.{}.tar'.format(currentTimestampStr, baseArchiveFilename, archiveFileNameSuffix) 
+        tarArchiveFilepath = mypycommons.file.joinPaths(getProjectCacheDir(), tarArchiveName)
+
+        logger.info("Creating inner TAR archive: '{}'".format(tarArchiveFilepath))
+        mypycommons.archive.createTarArchive(sourcePath, tarArchiveFilepath)
+
+        archiveName = '{}.7z'.format(tarArchiveName)
+        sourcePathFinal = tarArchiveFilepath
     else:
-        logger.info("No pre-existing archive file found in this destination dir: it must be empty")
+        archiveName = '{} {}.{}.7z'.format(currentTimestampStr, baseArchiveFilename, archiveFileNameSuffix) 
+        sourcePathFinal = sourcePath
 
-    if (mostRecentArchiveFile and sourceDataMatchesExistingArchive(sourcePath, mostRecentArchiveFile)):
-        logger.info("An archive with the same data as the source already exists in the destination: no new backup archive will be created")
-    else:
-        logger.info("Latest archive doesn't exist or doesn't contain the latest source data: a new backup archive will be created")
+    archiveFilepath = mypycommons.file.joinPaths(destinationDir, archiveName)
 
-        archiveName = '[{}] {}{}'.format(
-            mypycommons.time.getCurrentTimestampForFilename(), 
-            mypycommons.file.GetFilename(sourcePath),
-            archiveFileNameSuffix
-        ) 
-        archiveFilepath = mypycommons.file.JoinPaths(destinationPath, archiveName)
+    logger.info("Creating new 7z backup archive now: '{}'".format(archiveFilepath))
+    mypycommons.archive.create7zArchive(sourcePathFinal, archiveFilepath)
 
-        logger.info("Creating new backup archive now at {}".format(archiveFilepath))
-        create7zArchive(sourcePath, archiveFilepath)
+def changeDestinationDirectoryPermissions(destinationPath, backupDataPermissionsData):
+    logger.info("Updating file permissions for backup destination directory {}".format(destinationPath))
+    mypycommons.file.applyPermissionToPath(path=destinationPath, owner=backupDataPermissionsData['owner'], group=backupDataPermissionsData['group'], mask=backupDataPermissionsData['mask'], recursive=True)
 
-def performBackup(configData):
+
+def runBackupRule(ruleConfig, machineScriptsDir):
     '''
-    Reads the given backup config file and performs each backup from the definitions.
-
-    Params:
-        configFile: the Json prefbak config file
     '''
-    backupRules = configData['backupRules']
+    ruleName = ruleConfig['name']
+    ruleFiles = ruleConfig['files']
+    ruleInitScriptName = ruleConfig['initScript']
+    rulePostRunScriptName = ruleConfig['postRunScript']
+    backupDataPermissions = configData['backupFilesPermissions']
 
-    for backupRule in backupRules:
-        sourcePath = backupRule['sourcePath']
-        destinationPath = backupRule['backupDestDir']
+    logger.info("=====>Beginning Rule: {}".format(ruleName))
 
-        logger.info("Performing backup step for rule: {} -> {}".format(sourcePath, destinationPath))
-        performBackupStep(sourcePath, destinationPath)
+    if (ruleInitScriptName):
+        logger.info("Running the rule's configured init script")
+        ruleInitScriptFilepath = mypycommons.file.joinPaths(machineScriptsDir, ruleInitScriptName)
+        runScript(ruleInitScriptFilepath)
 
+    logger.info("-->Performing all backup steps for rule: {}".format(ruleName))
+
+    for ruleFile in ruleFiles:
+        sourcePath = ruleFile['sourcePath']
+        destinationDir = ruleFile['destinationDir']
+        logger.info("Starting file backup: '{}' --> '{}'".format(sourcePath, destinationDir))
+        performFileBackupStep(sourcePath, destinationDir)
+
+        # On Linux only:
         # Set the permissions on the destination path and the archive file within so that the user can read the backup
         if (not runningWindowsOS):
-            logger.info("Updating file permissions for backup destination directory {}".format(destinationPath))
-            backupDataPermissions = configData['backupDataPermissions']
-            mypycommons.file.applyPermissionToPath(path=destinationPath, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'], recursive=True)
+            changeDestinationDirectoryPermissions(destinationDir, backupDataPermissions)
+
+    if (rulePostRunScriptName):
+        logger.info("Running the rule's configured post-run script")
+        rulePostRunScriptFilepath = mypycommons.file.joinPaths(machineScriptsDir, rulePostRunScriptName)
+        runScript(rulePostRunScriptFilepath)
 
 
-
+        
 # ------------------------------------ Script 'main' execution -------------------------------------
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
 
-    thisProjectDir = mypycommons.file.getThisScriptCurrentDirectory()
-    thisProjectLogsDir = getProjectLogsDir()
-    thisProjectConfigDir = mypycommons.file.JoinPaths(thisProjectDir, 'machine-config')
-    thisProjectPrepScriptsDir = mypycommons.file.JoinPaths(thisProjectDir, 'machine-backup-prep-scripts')
+    parser.add_argument("--config-file", 
+        dest='configFilename',
+        type=str,
+        help="Name of the config file to use, located in this project's machine-config directory - If not specified, will use the config file named '<hostName>.config.json'"
+    )
+    group.add_argument('-l', '--list-rules', 
+        action='store_true',
+        dest='listRules',
+        help="Print the rules names from the config file that can be run"
+    )
+    group.add_argument('-r', '--run-rules', 
+        nargs='+', 
+        default=[],
+        dest='runRuleNames',
+        help="One or more specific rule names, seperated by [space], of the rules you want to run"
+    )
+    group.add_argument("-a", "--run-all", 
+        action='store_true',
+        dest='runAllRules',
+        help="Run all the rules set up in the config file"
+    )
 
-    # Setup logging for this script
-    logFilename = 'prefbak.log'
-    mypycommons.logger.initSharedLogger(logFilename=logFilename, logDir=thisProjectLogsDir)
-    mypycommons.logger.setSharedLoggerConsoleOutputLogLevel('debug')
-    logger = mypycommons.logger.getSharedLogger()
+    args = parser.parse_args()
 
-    machineName = getThisMachineName()
-    runningWindowsOS = thisMachineIsWindowsOS()
+    # Configure logger
+    projectLogsDir = getProjectLogsDir()
+    mypycommons.logger.configureLoggerWithBasicSettings(__name__, projectLogsDir)
 
-    if (runningWindowsOS):
-        sevenZipExeFilepath = "C:\\Program Files\\7-Zip\\7z.exe"
-        powershellExeFilepath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+    # Get machine name and other values needed
+    machineName = mypycommons.system.getThisMachineName()
+    runningWindowsOS = mypycommons.system.thisMachineIsWindowsOS()
+    logger.info("System properties: MachineName='{}', IsWindows='{}'".format(machineName, runningWindowsOS))
 
-        if (mypycommons.file.fileExists(sevenZipExeFilepath)):
-            logger.info("Using the 7zip executable program located at {}".format(sevenZipExeFilepath))
-        else:
-            raise FileNotFoundError("7zip executable program was not found at the default location on this system ({} does not exist)".format(sevenZipExeFilepath))
+    projectDir = mypycommons.file.getThisScriptCurrentDirectory()
+    machineConfigDir = mypycommons.file.joinPaths(projectDir, 'machine-config')
 
-    backupConfigName = '{}.config.json'.format(machineName)
-    backupConfigFilepath = mypycommons.file.JoinPaths(thisProjectConfigDir, backupConfigName)
+    scriptsDir = mypycommons.file.joinPaths(projectDir, 'machine-scripts')
+    machineScriptsDir = mypycommons.file.joinPaths(scriptsDir, machineName)
+
+    if (not mypycommons.file.pathExists(machineScriptsDir)):
+        raise FileNotFoundError("Error: The scripts directory for this machine ({}) does not exist".format(machineScriptsDir))
+
+    if (not args.configFilename):
+        backupConfigFilename = '{}.config.json'.format(machineName)
+        logger.info("Config file name not given: using the config file based on machine name: {}".format(backupConfigFilename))
+    else:
+        backupConfigFilename = args.configFilename
+
+    backupConfigFilepath = mypycommons.file.joinPaths(machineConfigDir, backupConfigFilename)
+
+    if (not mypycommons.file.pathExists(backupConfigFilepath)):
+        raise FileNotFoundError("Error: The backup config file '{}' for this machine does not exist: exiting".format(backupConfigFilepath)) 
+
+    logger.info("Loading prefbak config file: {}".format(backupConfigFilepath))
+    configData = mypycommons.file.readJsonFile(backupConfigFilepath)
+
+    # ---------------------------
+    # List rules, if arg is set
+    allBackupRules = configData['rules']
+
+    if (args.listRules):
+        for rule in allBackupRules:
+            print(rule['name'])
+        sys.exit(0)
 
     logger.info("Starting prefbak backup routine script for machine '{}'".format(machineName))
 
-    logger.info("Loading this machine's prefbak config file: {}".format(backupConfigFilepath))
-    configData = mypycommons.file.readJsonFile(backupConfigFilepath)
+    # ---------------------------
+    # Run init script
+    initScriptName = configData['globalInitScript']
+    if (initScriptName):
+        logger.info("Running the configured global init script")
+        initScriptFilepath = mypycommons.file.joinPaths(machineScriptsDir, initScriptName)
+        runScript(initScriptFilepath)
 
-    # Change permission on the log file to whatever permissions are configured in the machine config file
-    # so that the user can read the log file (if the log file is created when running this script as
-    # sudo, it will not be readable by other users)
-    if (not runningWindowsOS):
-        logger.info("Setting the log file permissions to those set in the machine's config file")
-        logFilepath = mypycommons.file.JoinPaths(thisProjectLogsDir, logFilename)
-        backupDataPermissions = configData['backupDataPermissions']
-        mypycommons.file.applyPermissionToPath(path=logFilepath, owner=backupDataPermissions['owner'], group=backupDataPermissions['group'], mask=backupDataPermissions['mask'])
+    # ----------------------------
+    # Perform backup
+    if (args.runAllRules):
+        backupRulesToRunConfig = allBackupRules
+        logger.info("Starting routine for all ({}) configured backup rules".format(str(len(backupRulesToRunConfig))))
+    else:
+        backupRulesToRunConfig = [ruleCfg for ruleCfg in allBackupRules if (ruleCfg['name'] in args.runRuleNames)]
+        backupRulesToRunNames = [rule['name'] for rule in backupRulesToRunConfig]
+        logger.info("Starting routine for the given ({}) configured backup rules: {}".format(str(len(backupRulesToRunConfig)), str(backupRulesToRunNames)))
 
-    # # Run the prep script, if this is configured for the machine
-    # if (configData['prepScript'] == 'true'):
-    #     if (runningWindowsOS):
-    #         prepScriptName = "backup-prep-{}.ps1".format(machineName)
-    #     else:
-    #         prepScriptName = "backup-prep-{}.sh".format(machineName)
+    for backupRuleConfig in backupRulesToRunConfig:
+        runBackupRule(backupRuleConfig, machineScriptsDir)
 
-    #     prepScriptFilepath = mypycommons.file.JoinPaths(thisProjectPrepScriptsDir, prepScriptName)
+    logger.info("Backup routine completed successfully")
 
-    #     if (runningWindowsOS):
-    #         runArgs = [powershellExeFilepath, prepScriptFilepath]
-    #     else:
-    #         runArgs = [prepScriptFilepath]
+    # ---------------------------
+    # Run postrun script
+    postScriptName = configData['globalPostRunScript']
+    if (postScriptName):
+        logger.info("Running the configured global post-run script")
+        postScriptFilepath = mypycommons.file.joinPaths(machineScriptsDir, postScriptName)
+        runScript(postScriptFilepath)
 
-    #     logger.info("Prep script configured for this machine: running script before doing the backup: {}".format(prepScriptFilepath))
-    #     subprocess.call(runArgs, shell=True)
-    #     logger.info("Prep script execution complete".format(prepScriptFilepath))
-        
-    logger.info("Beginning prefbak backup routine according to backup rules")
-    performBackup(configData)
-
-    logger.info("Backup routine completed successfully, script complete")
+    logger.info("All processes complete: prefbak operation finished successfully")
 
 
 

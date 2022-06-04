@@ -1,8 +1,7 @@
 __pycache__
-.vscode
 ~cache
 ~logs
-machine-backup-prep-scripts/*
+machine-scripts/*
 zinc.config.json
 copper.config.json
 py-venv-linux

@@ -1,21 +1,56 @@
 {
-    "prepScript": "true",
-    "backupDataPermissions": {
-        "owner": "nick",
-        "group": "nick",
+    "globalInitScript": "init.sh",
+    "globalPostRunScript": "postrun.sh",
+    "backupFilesPermissions": {
+        "owner": "user",
+        "group": "user",
         "mask": "700"
     },
-    "backupRules": [
+    "rules": [
         {
-            "sourcePath": "/home/user/some-file",
-            "backupPath": "destDir1"
+            "name": "bashrc",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/home/user/.bashrc",
+                    "destinationDir": "/prefbak-backups/AppData/bashrc"
+                }
+            ]
         },
         {
-            "sourcePath": "/home/user/some-folder",
-            "backupPath": "destDir2/subdir"
+            "name": "vim",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/home/user/.vimrc",
+                    "destinationDir": "/prefbak-backups/AppData/vim"
+                },
+                                {
+                    "sourcePath": "/home/user/.vim/colors",
+                    "destinationDir": "/prefbak-backups/AppData/vim"
+                },
+                                {
+                    "sourcePath": "/home/user/.Xresources",
+                    "destinationDir": "/prefbak-backups/zinc/AppData/vim"
+                }
+            ]
+        },
+        {
+            "name": "crontab",
+            "initScript": "crontab-output.sh",
+            "postRunScript": "crontab-output-cleanup.sh",
+            "files": [
+                {
+                    "sourcePath": "/home/user/Temp/Prefbak-Backup/crontab-nick",
+                    "destinationDir": "/prefbak-backups/zinc/AppData/crontab"
+                },
+                                {
+                    "sourcePath": "/home/user/Temp/Prefbak-Backup/crontab-root",
+                    "destinationDir": "/prefbak-backups/zinc/AppData/crontab"
+                }
+            ]
         }
     ]
 }
-
-
-
