@@ -16,11 +16,13 @@ import com.nwrobel.mypycommons.system
 import com.nwrobel.mypycommons.archive
 
 # Setup logging for this entire module/script
-logger = logging.getLogger(__name__)
+loggerName = 'prefbak-logger'
+logger = mypycommons.logger.getLogger(loggerName)
 
 # Module-wide global variables, used by many of the helper functions below
 archiveFileNameSuffix = "backup"
 powershellExeFilepath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+runningWindowsOS = mypycommons.system.thisMachineIsWindowsOS()
 
 # ----------------------------- Script helper functions --------------------------------------------
 def getProjectLogsDir():
@@ -165,12 +167,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Configure logger
-    projectLogsDir = getProjectLogsDir()
-    mypycommons.logger.configureLoggerWithBasicSettings(__name__, projectLogsDir)
+    mypycommons.logger.configureLoggerWithBasicSettings(loggerName=loggerName, logDir=getProjectLogsDir())
 
-    # Get machine name and other values needed
+    # Get machine name
     machineName = mypycommons.system.getThisMachineName()
-    runningWindowsOS = mypycommons.system.thisMachineIsWindowsOS()
     logger.info("System properties: MachineName='{}', IsWindows='{}'".format(machineName, runningWindowsOS))
 
     projectDir = mypycommons.file.getThisScriptCurrentDirectory()
