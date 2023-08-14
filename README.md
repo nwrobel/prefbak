@@ -1,14 +1,9 @@
 # prefbak
 ## Overview
-This is a tool that allows you to properly backup your application data and other desired files for one or more machines. 
-It allows desired backups for each machine to be configured in advance so that backup routines of all critical files can be run easily with few commands.
-Backups will preserve the original Unix file permissions (owner, group, mask) of each source file or directory.
-The tool will create an archive file for each file or folder configured to be backed up and store it at the configured location. The archive file consists of the file/directory compressed as a .tar archive, which is then compressed as a 7z archive. 
-The inner .tar archive is necessary to preserve the file permissions.
+=
 
 ## System Requirements
-- OS: Linux or Windows (tested on Ubuntu 18.04 and Windows 10)
-- 7zip must be installed and added to the system path
+
 
 
 ## Installation
@@ -17,12 +12,22 @@ The inner .tar archive is necessary to preserve the file permissions.
 - Run the script `setup-linux.sh` or `setup-windows.ps1` 
 
 ## Configuration
-This tool can be configured to perform backups for one or more machines. Files to include in the backup of a machine are managed by a Json config file for that machine. For each machine that you want backed up, create a file in the `machine-config` dir of the project named "hostname.config.json", where "hostname" is the name of the machine.
-See the example template backup config file `yourMachineName.config.json`, included by default with the project, for reference on how to structure the JSON file.
+All files will be stored in the backupRootDir. A subfolder is created in the root dir with the name 
+of rule as set in the config.
 
-"prepScript" - true/false whether or not a prerun script exists and should be run for this machine ()
-"backupDataPermissions" - file permissions that the backup files, stored in backupRootDir, should be set to so that they can be accessed - do not include this value(s) if backing up a Windows system
-"backupRules" - array of rules, each one has 2 values: "sourcePath" for the path of the source file or directory on the machine, and "backupPath" for the path of where the backup of the source path should be stored
+rsync: path given with be copied/synced to the rule subfolder, overwriting existing files
+
+tar: path will be archived to tar file and named like: "[YYYY-MM-dd HH.mm.ss] file-or-folder-name.tar" 
+Use this option to preserve file permissions.
+
+Set the "backupFilePermissions" to change permissions on the backed up files after backup is complete.
+
+
+Config file components:
+- global
+--- powershellFilepath
+--- 7zipFilepath
+- rules
 
 ## Use
 cd to the directory of the downloaded project repo and run the backup script with the following:

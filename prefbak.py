@@ -1,12 +1,15 @@
 '''
 Script that performs a "prefbak" routine: that is, performs a backup of a machine according to the
 backup rules defined in that machine's prefbak config file.
+
+
 '''
 
 import logging
 import subprocess
 import argparse
 import sys
+from typing import Literal, List
 
 from com.nwrobel import mypycommons
 import com.nwrobel.mypycommons.file
@@ -15,40 +18,19 @@ import com.nwrobel.mypycommons.logger
 import com.nwrobel.mypycommons.system
 import com.nwrobel.mypycommons.archive
 
+import helpers, config
+
 # Setup logging for this entire module/script
 loggerName = 'prefbak-logger'
 logger = mypycommons.logger.getLogger(loggerName)
 
-# Module-wide global variables, used by many of the helper functions below
-archiveFileNameSuffix = "backup"
-powershellExeFilepath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-runningWindowsOS = mypycommons.system.thisMachineIsWindowsOS()
 
-# ----------------------------- Script helper functions --------------------------------------------
-def getProjectLogsDir():
-    currentDir = mypycommons.file.getThisScriptCurrentDirectory()
-    logsDir = mypycommons.file.joinPaths(currentDir, '~logs')
-
-    if (not mypycommons.file.pathExists(logsDir)):
-        mypycommons.file.createDirectory(logsDir)
-    
-    return logsDir
-
-def getProjectCacheDir():
-    currentDir = mypycommons.file.getThisScriptCurrentDirectory()
-    cacheDir = mypycommons.file.joinPaths(currentDir, '~cache')
-
-    if (not mypycommons.file.pathExists(cacheDir)):
-        mypycommons.file.createDirectory(cacheDir)
-    
-    return cacheDir
-
-def runScript(scriptFilepath):
+def runScript(scriptFilepath: str, config: config.PrefbakConfig):
     if (not mypycommons.file.pathExists(scriptFilepath)):
         raise FileNotFoundError("Error: The script '{}' does not exist".format(scriptFilepath))
 
-    if (runningWindowsOS):
-        runArgs = [powershellExeFilepath, scriptFilepath]
+    if (config.globalConfig.runningWindowsOS):
+        runArgs = [config.globalConfig.powershellFilepath, scriptFilepath]
     else:
         runArgs = [scriptFilepath]
 
@@ -57,7 +39,24 @@ def runScript(scriptFilepath):
     logger.info("Script execution complete")
 
 
-def performFileBackupStep(sourcePath, destinationDir):
+
+def rsyncRun(sourcePath: str, destinationDir: str, rsyncFilepath: str):
+    logger.info("Performing rsync to destination dir: '{}'".format(destinationDir))
+
+    runArgs = [rsyncFilepath, '-aP', '--delete-after', sourcePath, destinationDir]
+    subprocess.call(runArgs, shell=True)
+
+def tarRun(sourcePath: str, destinationDir: str):
+    currentTimestampStr = mypycommons.time.getCurrentTimestampForFilename()
+    baseArchiveFilename = mypycommons.file.getFilename(sourcePath)
+
+    tarArchiveName = '{} {}.tar'.format(currentTimestampStr, baseArchiveFilename) 
+    tarArchiveFilepath = mypycommons.file.joinPaths(destinationDir, tarArchiveName)
+
+    logger.info("Creating TAR archive: '{}'".format(tarArchiveFilepath))
+    mypycommons.archive.createTarArchive(sourcePath, tarArchiveFilepath)
+
+def performRuleFileBackupStep(sourcePath: str, fullDestDir: str, operation: Literal['rsync', 'tar'], rsyncFilepath: str):
     '''
     Performs a single backup operation. Files can either be mirrored/copied from the source path to 
     the destination path, or an archive file at the destination path can be made from the source
@@ -68,72 +67,56 @@ def performFileBackupStep(sourcePath, destinationDir):
         destinationDir: destination dir to use as the destination/backup 
             location. Use the name of the archive file if also using the 'compress' param
     '''
-    if (not mypycommons.file.pathExists(destinationDir)):
-        logger.info("Backup destination directory '{}' does not exist: creating it".format(destinationDir))
-        mypycommons.file.createDirectory(destinationDir)
 
-    currentTimestampStr = mypycommons.time.getCurrentTimestampForFilename()
-    baseArchiveFilename = mypycommons.file.getFilename(sourcePath)
-    archiveName = ''
-    sourcePathFinal = ''
 
-    # If we aren't running Windows, we want to use the 'tar' command, available on non-win systems
-    if (not runningWindowsOS):
-        tarArchiveName = '{} {}.{}.tar'.format(currentTimestampStr, baseArchiveFilename, archiveFileNameSuffix) 
-        tarArchiveFilepath = mypycommons.file.joinPaths(getProjectCacheDir(), tarArchiveName)
+    if (operation == 'tar'):
+        tarRun(sourcePath, fullDestDir)
 
-        logger.info("Creating inner TAR archive: '{}'".format(tarArchiveFilepath))
-        mypycommons.archive.createTarArchive(sourcePath, tarArchiveFilepath)
+    elif (ruleFileConfig.operation == 'rsync'):
+        rsyncRun(sourcePath, fullDestDir, rsyncFilepath)
 
-        archiveName = '{}.7z'.format(tarArchiveName)
-        sourcePathFinal = tarArchiveFilepath
+# def changeDestinationDirectoryPermissions(destinationPath, backupDataPermissionsData):
+#     logger.info("Updating file permissions for backup destination directory {}".format(destinationPath))
+#     mypycommons.file.applyPermissionToPath(path=destinationPath, owner=backupDataPermissionsData['owner'], group=backupDataPermissionsData['group'], mask=backupDataPermissionsData['mask'], recursive=True)
+
+def getFullDestinationDir(destinationRootDir: str, ruleName: str, destinationSubDir: str) -> str:
+    ruleDestinationMainDir = mypycommons.file.joinPaths(destinationRootDir, ruleName)
+    
+    if (destinationSubDir):
+        fullDestDir = mypycommons.file.joinPaths(ruleDestinationMainDir, destinationSubDir)
     else:
-        archiveName = '{} {}.{}.7z'.format(currentTimestampStr, baseArchiveFilename, archiveFileNameSuffix) 
-        sourcePathFinal = sourcePath
+        fullDestDir = ruleDestinationMainDir
+    
+    if (not mypycommons.file.pathExists(fullDestDir)):
+        mypycommons.file.createDirectory(fullDestDir)
 
-    archiveFilepath = mypycommons.file.joinPaths(destinationDir, archiveName)
+    return fullDestDir
 
-    logger.info("Creating new 7z backup archive now: '{}'".format(archiveFilepath))
-    mypycommons.archive.create7zArchive(sourcePathFinal, archiveFilepath)
-
-def changeDestinationDirectoryPermissions(destinationPath, backupDataPermissionsData):
-    logger.info("Updating file permissions for backup destination directory {}".format(destinationPath))
-    mypycommons.file.applyPermissionToPath(path=destinationPath, owner=backupDataPermissionsData['owner'], group=backupDataPermissionsData['group'], mask=backupDataPermissionsData['mask'], recursive=True)
-
-
-def runBackupRule(ruleConfig, machineScriptsDir):
+def runBackupRule(ruleConfig: config.PrefbackConfig_Rule, destinationRootDir: str, rsyncFilepath: str):
     '''
     '''
-    ruleName = ruleConfig['name']
-    ruleFiles = ruleConfig['files']
-    ruleInitScriptName = ruleConfig['initScript']
-    rulePostRunScriptName = ruleConfig['postRunScript']
-    backupDataPermissions = configData['backupFilesPermissions']
+    logger.info("=====>Beginning Rule: {}".format(ruleConfig.name))
 
-    logger.info("=====>Beginning Rule: {}".format(ruleName))
-
-    if (ruleInitScriptName):
+    if (ruleConfig.initScript):
         logger.info("Running the rule's configured init script")
-        ruleInitScriptFilepath = mypycommons.file.joinPaths(machineScriptsDir, ruleInitScriptName)
-        runScript(ruleInitScriptFilepath)
+        scriptFilepath = mypycommons.file.joinPaths(helpers.getProjectScriptsDir(), ruleConfig.initScript)
+        runScript(scriptFilepath)
 
-    logger.info("-->Performing all backup steps for rule: {}".format(ruleName))
+    for ruleFileConfig in ruleConfig.files:
+        fullDestDir = getFullDestinationDir(destinationRootDir, ruleConfig.name, ruleFileConfig.destinationSubDir)
 
-    for ruleFile in ruleFiles:
-        sourcePath = ruleFile['sourcePath']
-        destinationDir = ruleFile['destinationDir']
-        logger.info("Starting file backup: '{}' --> '{}'".format(sourcePath, destinationDir))
-        performFileBackupStep(sourcePath, destinationDir)
+        logger.info("Starting file backup: '{}' to dir --> '{}'".format(ruleFileConfig.sourcePath, fullDestDir))
+        performFileBackupStep(ruleFileConfig.sourcePath, fullDestDir, ruleFileConfig.operation, rsyncFilepath)
 
         # On Linux only:
         # Set the permissions on the destination path and the archive file within so that the user can read the backup
-        if (not runningWindowsOS):
-            changeDestinationDirectoryPermissions(destinationDir, backupDataPermissions)
+        # if (not runningWindowsOS):
+        #     changeDestinationDirectoryPermissions(destinationDir, backupDataPermissions)
 
-    if (rulePostRunScriptName):
-        logger.info("Running the rule's configured post-run script")
-        rulePostRunScriptFilepath = mypycommons.file.joinPaths(machineScriptsDir, rulePostRunScriptName)
-        runScript(rulePostRunScriptFilepath)
+    if (ruleConfig.postScript):
+        logger.info("Running the rule's configured post script")
+        scriptFilepath = mypycommons.file.joinPaths(helpers.getProjectScriptsDir(), ruleConfig.postScript)
+        runScript(scriptFilepath)
 
 
         
@@ -142,10 +125,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
 
-    parser.add_argument("--config-file", 
+    parser.add_argument("-c", '--config-file', 
         dest='configFilename',
         type=str,
-        help="Name of the config file to use, located in this project's machine-config directory - If not specified, will use the config file named '<hostName>.config.json'"
+        help="Name of the config file to use, located in this project's machine-config directory"
     )
     group.add_argument('-l', '--list-rules', 
         action='store_true',
@@ -167,76 +150,49 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Configure logger
-    mypycommons.logger.configureLoggerWithBasicSettings(loggerName=loggerName, logDir=getProjectLogsDir())
+    mypycommons.logger.configureLoggerWithBasicSettings(loggerName=loggerName, logDir=helpers.getProjectLogsDir())
 
-    # Get machine name
-    machineName = mypycommons.system.getThisMachineName()
-    logger.info("System properties: MachineName='{}', IsWindows='{}'".format(machineName, runningWindowsOS))
-
-    projectDir = mypycommons.file.getThisScriptCurrentDirectory()
-    machineConfigDir = mypycommons.file.joinPaths(projectDir, 'machine-config')
-
-    scriptsDir = mypycommons.file.joinPaths(projectDir, 'machine-scripts')
-    machineScriptsDir = mypycommons.file.joinPaths(scriptsDir, machineName)
-
-    if (not mypycommons.file.pathExists(machineScriptsDir)):
-        raise FileNotFoundError("Error: The scripts directory for this machine ({}) does not exist".format(machineScriptsDir))
-
-    if (not args.configFilename):
-        backupConfigFilename = '{}.config.json'.format(machineName)
-        logger.info("Config file name not given: using the config file based on machine name: {}".format(backupConfigFilename))
-    else:
-        backupConfigFilename = args.configFilename
-
-    backupConfigFilepath = mypycommons.file.joinPaths(machineConfigDir, backupConfigFilename)
-
-    if (not mypycommons.file.pathExists(backupConfigFilepath)):
-        raise FileNotFoundError("Error: The backup config file '{}' for this machine does not exist: exiting".format(backupConfigFilepath)) 
-
-    logger.info("Loading prefbak config file: {}".format(backupConfigFilepath))
-    configData = mypycommons.file.readJsonFile(backupConfigFilepath)
+    # Get config
+    configFilepath = mypycommons.file.joinPaths(helpers.getProjectConfigDir(), args.configFilename)
+    prefbackConfig = config.PrefbakConfig(configFilepath)
 
     # ---------------------------
     # List rules, if arg is set
-    allBackupRules = configData['rules']
-
     if (args.listRules):
-        for rule in allBackupRules:
-            print(rule['name'])
+        for rule in prefbackConfig.rulesConfig:
+            print(rule.name)
         sys.exit(0)
 
-    logger.info("Starting prefbak backup routine script for machine '{}'".format(machineName))
+    logger.info("Starting prefbak backup routine")
 
     # ---------------------------
     # Run init script
-    initScriptName = configData['globalInitScript']
-    if (initScriptName):
+    if (prefbackConfig.globalConfig.initScriptName):
         logger.info("Running the configured global init script")
-        initScriptFilepath = mypycommons.file.joinPaths(machineScriptsDir, initScriptName)
-        runScript(initScriptFilepath)
+        scriptFilepath = mypycommons.file.joinPaths(helpers.getProjectScriptsDir(), prefbackConfig.globalConfig.initScriptName)
+        runScript(scriptFilepath, prefbackConfig)
 
     # ----------------------------
     # Perform backup
     if (args.runAllRules):
-        backupRulesToRunConfig = allBackupRules
-        logger.info("Starting routine for all ({}) configured backup rules".format(str(len(backupRulesToRunConfig))))
+        backupRulesToRunConfig = prefbackConfig.rulesConfig
     else:
-        backupRulesToRunConfig = [ruleCfg for ruleCfg in allBackupRules if (ruleCfg['name'] in args.runRuleNames)]
-        backupRulesToRunNames = [rule['name'] for rule in backupRulesToRunConfig]
-        logger.info("Starting routine for the given ({}) configured backup rules: {}".format(str(len(backupRulesToRunConfig)), str(backupRulesToRunNames)))
+        backupRulesToRunConfig = [ruleCfg for ruleCfg in prefbackConfig.rulesConfig if (ruleCfg.name in args.runRuleNames)]
+    
+    backupRulesToRunNames = [rule.name for rule in backupRulesToRunConfig]
+    logger.info("Starting routine for the given ({}) configured backup rules: {}".format(str(len(backupRulesToRunConfig)), str(backupRulesToRunNames)))
 
     for backupRuleConfig in backupRulesToRunConfig:
-        runBackupRule(backupRuleConfig, machineScriptsDir)
+        runBackupRule(backupRuleConfig, prefbackConfig.globalConfig.destinationRootDir, prefbackConfig.globalConfig.rsyncFilepath)
 
     logger.info("Backup routine completed successfully")
 
     # ---------------------------
     # Run postrun script
-    postScriptName = configData['globalPostRunScript']
-    if (postScriptName):
-        logger.info("Running the configured global post-run script")
-        postScriptFilepath = mypycommons.file.joinPaths(machineScriptsDir, postScriptName)
-        runScript(postScriptFilepath)
+    if (prefbackConfig.globalConfig.postScriptName):
+        logger.info("Running the configured global post script")
+        scriptFilepath = mypycommons.file.joinPaths(helpers.getProjectScriptsDir(), prefbackConfig.globalConfig.postScriptName)
+        runScript(scriptFilepath, prefbackConfig)
 
     logger.info("All processes complete: prefbak operation finished successfully")
 

@@ -1,54 +1,38 @@
 {
-    "globalInitScript": "init.sh",
-    "globalPostRunScript": "postrun.sh",
-    "backupFilesPermissions": {
-        "owner": "user",
-        "group": "user",
-        "mask": "700"
+    "global": {
+        "powershellFilepath": "",
+        "rsyncFilepath": "",
+        "initScript": "zinc/init.sh",
+        "postScript": "zinc/post.sh",
+        "destinationRootDir": "/prefbak-backups/AppData"
     },
     "rules": [
         {
             "name": "bashrc",
             "initScript": "",
-            "postRunScript": "",
+            "postScript": "",
             "files": [
                 {
                     "sourcePath": "/home/user/.bashrc",
-                    "destinationDir": "/prefbak-backups/AppData/bashrc"
+                    "destinationSubDir": "",
+                    "operation": "rsync | tar"
                 }
             ]
         },
         {
             "name": "vim",
             "initScript": "",
-            "postRunScript": "",
+            "postScript": "",
             "files": [
                 {
-                    "sourcePath": "/home/user/.vimrc",
-                    "destinationDir": "/prefbak-backups/AppData/vim"
+                    "sourcePath": "/home/user/.vim",
+                    "destinationSubDir": "user",
+                    "operation": "rsync"
                 },
                                 {
-                    "sourcePath": "/home/user/.vim/colors",
-                    "destinationDir": "/prefbak-backups/AppData/vim"
-                },
-                                {
-                    "sourcePath": "/home/user/.Xresources",
-                    "destinationDir": "/prefbak-backups/zinc/AppData/vim"
-                }
-            ]
-        },
-        {
-            "name": "crontab",
-            "initScript": "crontab-output.sh",
-            "postRunScript": "crontab-output-cleanup.sh",
-            "files": [
-                {
-                    "sourcePath": "/home/user/Temp/Prefbak-Backup/crontab-nick",
-                    "destinationDir": "/prefbak-backups/zinc/AppData/crontab"
-                },
-                                {
-                    "sourcePath": "/home/user/Temp/Prefbak-Backup/crontab-root",
-                    "destinationDir": "/prefbak-backups/zinc/AppData/crontab"
+                    "sourcePath": "/home/user2/.vim",
+                    "destinationSubDir": "user2",
+                    "operation": "rsync"
                 }
             ]
         }
