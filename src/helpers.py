@@ -1,10 +1,14 @@
-import com.nwrobel.mypycommons.file
+from com.nwrobel import mypycommons
+from com.nwrobel.mypycommons import file
 
 
 # ----------------------------- Script helper functions --------------------------------------------
-def getProjectLogsDir():
+def getProjectRootDir():
     currentDir = mypycommons.file.getThisScriptCurrentDirectory()
-    logsDir = mypycommons.file.joinPaths(currentDir, '~logs')
+    return mypycommons.file.joinPaths(currentDir, '..')
+
+def getProjectLogsDir():
+    logsDir = mypycommons.file.joinPaths(getProjectRootDir(), '~logs')
 
     if (not mypycommons.file.pathExists(logsDir)):
         mypycommons.file.createDirectory(logsDir)
@@ -12,8 +16,7 @@ def getProjectLogsDir():
     return logsDir
 
 def getProjectCacheDir():
-    currentDir = mypycommons.file.getThisScriptCurrentDirectory()
-    cacheDir = mypycommons.file.joinPaths(currentDir, '~cache')
+    cacheDir = mypycommons.file.joinPaths(getProjectRootDir(), '~cache')
 
     if (not mypycommons.file.pathExists(cacheDir)):
         mypycommons.file.createDirectory(cacheDir)
@@ -21,8 +24,7 @@ def getProjectCacheDir():
     return cacheDir
 
 def getProjectScriptsDir():
-    currentDir = mypycommons.file.getThisScriptCurrentDirectory()
-    scriptsDir = mypycommons.file.joinPaths(currentDir, 'machine-scripts')
+    scriptsDir = mypycommons.file.joinPaths(getProjectRootDir(), 'machine-scripts')
 
     if (not mypycommons.file.pathExists(scriptsDir)):
         raise FileNotFoundError("Project Scripts dir machine-scripts not found")
@@ -30,8 +32,7 @@ def getProjectScriptsDir():
     return scriptsDir
 
 def getProjectConfigDir():
-    currentDir = mypycommons.file.getThisScriptCurrentDirectory()
-    configDir = mypycommons.file.joinPaths(currentDir, 'machine-config')
+    configDir = mypycommons.file.joinPaths(getProjectRootDir(), 'machine-config')
 
     if (not mypycommons.file.pathExists(configDir)):
         raise FileNotFoundError("Project config dir machine-config' not found")
@@ -39,8 +40,7 @@ def getProjectConfigDir():
     return configDir
 
 def getProjectBinDir():
-    currentDir = mypycommons.file.getThisScriptCurrentDirectory()
-    binDir = mypycommons.file.joinPaths(currentDir, 'bin')
+    binDir = mypycommons.file.joinPaths(getProjectRootDir(), 'bin')
 
     if (not mypycommons.file.pathExists(binDir)):
         raise FileNotFoundError("Project bin dir not found")

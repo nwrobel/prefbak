@@ -12,35 +12,11 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Prefbak: copper_test.config, --list-rules",
-            "type": "python",
-            "request": "launch",
-            "program": "prefbak.py",
-            "args": ["--config-file", "copper_test.config.json", "--list-rules"],
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "Prefbak: copper_test.config, --run-rules (foobar2000)",
-            "type": "python",
-            "request": "launch",
-            "program": "prefbak.py",
-            "args": ["--config-file", "copper_test.config.json", "--run-rules", "foobar2000"],
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "Prefbak: copper_test.config, --run-rules (putty foobar2000)",
-            "type": "python",
-            "request": "launch",
-            "program": "prefbak.py",
-            "args": ["--config-file", "copper_test.config.json", "--run-rules", "putty", "foobar2000"],
-            "console": "integratedTerminal"
-        },
-        {
             "name": "Prefbak: copper_test.config, --run-all",
             "type": "python",
             "request": "launch",
-            "program": "prefbak.py",
-            "args": ["--config-file", "copper_test.config.json", "--run-all"],
+            "program": "main.py",
+            "args": ["copper_test.config.json", "--run-all"],
             "console": "integratedTerminal"
         }
     ]
