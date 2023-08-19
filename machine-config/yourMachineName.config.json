@@ -1,6 +1,7 @@
 {
     "global": {
         "powershellFilepath": "",
+        "teracopyFilepath": "",
         "rsyncFilepath": "",
         "initScript": "zinc/init.sh",
         "postScript": "zinc/post.sh",

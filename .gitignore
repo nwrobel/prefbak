@@ -2,7 +2,5 @@ __pycache__
 ~cache
 ~logs
 machine-scripts/*
-zinc.*config.json
-copper*.config.json
 py-venv-linux
 py-venv-windows

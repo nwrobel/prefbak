@@ -52,42 +52,19 @@ if __name__ == "__main__":
     configFilepath = mypycommons.file.joinPaths(helpers.getProjectConfigDir(), args.configFilename)
     app = prefbak.PrefbakApp(configFilepath)
 
-    # # ---------------------------
-    # # List rules, if arg is set
-    # if (args.listRules):
-    #     for rule in prefbackConfig.rulesConfig:
-    #         print(rule.name)
-    #     sys.exit(0)
+    # ---------------------------
+    # List rules, if arg is set
+    if (args.listRules):
+        for rule in app.config.rulesConfig:
+            print(rule.name)
+        sys.exit(0)
 
-    # logger.info("Starting prefbak backup routine")
-
-    # # ---------------------------
-    # # Run init script
-    # if (prefbackConfig.globalConfig.initScriptName):
-    #     logger.info("Running the configured global init script")
-    #     scriptFilepath = mypycommons.file.joinPaths(helpers.getProjectScriptsDir(), prefbackConfig.globalConfig.initScriptName)
-    #     runScript(scriptFilepath, prefbackConfig)
-
-    # # ----------------------------
-    # # Perform backup
-    # if (args.runAllRules):
-    #     backupRulesToRunConfig = prefbackConfig.rulesConfig
-    # else:
-    #     backupRulesToRunConfig = [ruleCfg for ruleCfg in prefbackConfig.rulesConfig if (ruleCfg.name in args.runRuleNames)]
+    if (args.runAllRules):
+        backupRulesToRunConfig = app.config.rulesConfig
+    else:
+        backupRulesToRunConfig = [ruleCfg for ruleCfg in app.config.rulesConfig if (ruleCfg.name in args.runRuleNames)]
     
-    # backupRulesToRunNames = [rule.name for rule in backupRulesToRunConfig]
-    # logger.info("Starting routine for the given ({}) configured backup rules: {}".format(str(len(backupRulesToRunConfig)), str(backupRulesToRunNames)))
+    backupRulesToRunNames = [rule.name for rule in backupRulesToRunConfig]
+    app.run(backupRulesToRunNames)
 
-    # for backupRuleConfig in backupRulesToRunConfig:
-    #     runBackupRule(backupRuleConfig, prefbackConfig.globalConfig.destinationRootDir, prefbackConfig.globalConfig.rsyncFilepath)
-
-    # logger.info("Backup routine completed successfully")
-
-    # # ---------------------------
-    # # Run postrun script
-    # if (prefbackConfig.globalConfig.postScriptName):
-    #     logger.info("Running the configured global post script")
-    #     scriptFilepath = mypycommons.file.joinPaths(helpers.getProjectScriptsDir(), prefbackConfig.globalConfig.postScriptName)
-    #     runScript(scriptFilepath, prefbackConfig)
-
-    # logger.info("All processes complete: prefbak operation finished successfully")
+    logger.info("All processes complete: prefbak operation finished successfully")

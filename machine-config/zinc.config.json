@@ -1,0 +1,198 @@
+{
+    "globalInitScript": "init.sh",
+    "globalPostRunScript": "postrun.sh",
+    "backupFilesPermissions": {
+        "owner": "nick",
+        "group": "nick",
+        "mask": "700"
+    },
+    "rules": [
+        {
+            "name": "bashrc",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/home/nick/.bashrc",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/bashrc"
+                }
+            ]
+        },
+        {
+            "name": "vim",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/home/nick/.vimrc",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/vim"
+                },
+                                {
+                    "sourcePath": "/home/nick/.vim/colors",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/vim"
+                },
+                                {
+                    "sourcePath": "/home/nick/.Xresources",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/vim"
+                }
+            ]
+        },
+        {
+            "name": "crontab",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/home/nick/Temp/Prefbak-Backup/crontab-nick",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/crontab"
+                },
+                                {
+                    "sourcePath": "/home/nick/Temp/Prefbak-Backup/crontab-root",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/crontab"
+                }
+            ]
+        },
+        {
+            "name": "zfs",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/home/nick/Temp/Prefbak-Backup/datastore-zfs-zpool-properties.txt",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/zfs"
+                },
+                {
+                    "sourcePath": "/etc/zfs/zed.d/zed.rc",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/zfs"
+                }
+            ]
+        },
+        {
+            "name": "icecast",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/etc/icecast2",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/icecast"
+                }
+            ]
+        },
+        {
+            "name": "mpd",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/etc/mpd.conf",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/mpd"
+                },
+                {
+                    "sourcePath": "/var/log/mpd-master.log",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/mpd/logs"
+                }
+            ]
+        },
+        {
+            "name": "samba",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/etc/samba/smb.conf",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/samba"
+                }
+            ]
+        },
+        {
+            "name": "postfix",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/etc/postfix",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/postfix"
+                }
+            ]
+        },
+        {
+            "name": "rclone",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/home/nick/.config/rclone/rclone.conf",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/rclone"
+                },
+                {
+                    "sourcePath": "/home/nick/.secrets/rclone-gdrive-ds-svc-acct.json",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/rclone"
+                },
+                {
+                    "sourcePath": "/var/log/rclone",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/rclone/logs"
+                }
+            ]
+        },
+        {
+            "name": "ssh",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/home/nick/.ssh",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/ssh"
+                },
+                {
+                    "sourcePath": "/etc/ssh/ssh_config",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/ssh"
+                },
+                {
+                    "sourcePath": "/etc/ssh/sshd_config",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/ssh"
+                }
+            ]
+        },
+        {
+            "name": "piwigo",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/var/www/html/piwigo",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/piwigo"
+                },
+                {
+                    "sourcePath": "/home/nick/Temp/Prefbak-Backup/piwigo-database.sql",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/piwigo"
+                },
+                {
+                    "sourcePath": "/home/nick/.my.cnf",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/piwigo"
+                }
+            ]
+        },
+        {
+            "name": "smartmontools",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/etc/smartd.conf",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/smartmontools"
+                }
+            ]
+        },
+        {
+            "name": "rsyslog",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "/etc/rsyslog.d/mpd.conf",
+                    "destinationDir": "/datastore/nick/Device & App Backups/zinc/AppData/rsyslog"
+                }
+            ]
+        }
+    ]
+}

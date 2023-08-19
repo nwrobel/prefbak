@@ -13,23 +13,24 @@ loggerName = 'prefbak-logger'
 logger = mypycommons.logger.getLogger(loggerName)
 
 powershellDefaultFilepath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-rsyncDefaultFilepathLinux = 'rsync'
+teracopyDefaultFilepath = "C:\\Program Files\\TeraCopy\\TeraCopy.exe"
+rsyncDefaultFilepath = 'rsync'
 
 class PrefbackConfig_Global():
-    def __init__(self, destinationRootDir: str, powershellFilepath: str = None, rsyncFilepath: str = None, initScriptName: str = None, postScriptName: str = None):
-        # Set default powershell path if not provided
+    def __init__(self, destinationRootDir: str, powershellFilepath: str = None, teracopyFilepath: str = None, rsyncFilepath: str = None, initScriptName: str = None, postScriptName: str = None):
+        # Set defaults if not provided
         if (not powershellFilepath):
             self.powershellFilepath = powershellDefaultFilepath
         else:    
-            self.powershellFilepath = powershellFilepath 
+            self.powershellFilepath = powershellFilepath
 
-        # Set the default rsync path, if not set, depending on OS
-        runningWindows = mypycommons.system.thisMachineIsWindowsOS()
-        if (not rsyncFilepath and runningWindows):
-            raise ValueError("rsync filepath is required for windows")
+        if (not teracopyFilepath):
+            self.teracopyFilepath = teracopyDefaultFilepath
+        else:    
+            self.teracopyFilepath = teracopyFilepath
 
-        if (not rsyncFilepath and not runningWindows):
-            self.rsyncFilepath = rsyncDefaultFilepathLinux
+        if (not rsyncFilepath):
+            self.rsyncFilepath = rsyncDefaultFilepath
         else:
             self.rsyncFilepath = rsyncFilepath
              
@@ -40,7 +41,7 @@ class PrefbackConfig_Global():
             raise ValueError("Parameter destinationRootDir is required")
 
         if (not mypycommons.file.pathExists(destinationRootDir)):
-            logger.info("Backup destination directory '{}' does not exist: creating it".format(destinationRootDir))
+            logger.info("Backup destination root directory '{}' does not exist: creating it".format(destinationRootDir))
             mypycommons.file.createDirectory(destinationRootDir)
 
         self.destinationRootDir = destinationRootDir
@@ -58,16 +59,20 @@ class PrefbackConfig_Rule():
         self.fileConfigs = fileConfigs
 
 class PrefbackConfig_Rule_File():
-    def __init__(self, sourcePath: str, destinationSubDir: str, operation: Literal['rsync', 'tar']):
+    def __init__(self, sourcePath: str, destinationSubDir: str, operation: Literal['rsync', 'tar', 'teracopy']):
         if (not sourcePath):
             raise ValueError("Parameter sourcePath is required")
 
-        if (operation != 'rsync' and operation != 'tar'):
-            raise ValueError("Parameter operation must be rsync or tar")
+        if (operation != 'rsync' and operation != 'tar' and operation != 'teracopy'):
+            raise ValueError("Parameter operation must be one of: rsync,tar,teracopy")
 
         runningWindows = mypycommons.system.thisMachineIsWindowsOS()
-        if (runningWindows and operation == 'tar'):
-            raise ValueError("tar operation is not yet supported on windows")
+        if (runningWindows):
+            if (operation == 'tar' or operation == 'rsync'):
+                raise ValueError("only teracopy operation is currently supported on windows")
+        else:
+            if (operation == 'teracopy'):
+                raise ValueError("only rsync/tar operation is supported on linux")            
         
         self.sourcePath = sourcePath
         self.operation = operation 
@@ -92,11 +97,12 @@ class PrefbakConfig():
         rulesConfigJson = jsonDict['rules']
 
         self.globalConfig = PrefbackConfig_Global(
-            powershellFilepath=self.getConfigKeyValue(globalConfigJson, 'powershellFilepath'),
-            rsyncFilepath=self.getConfigKeyValue(globalConfigJson, 'rsyncFilepath'),
-            initScriptName=self.getConfigKeyValue(globalConfigJson, 'initScript'),
-            postScriptName=self.getConfigKeyValue(globalConfigJson, 'postScript'),
-            destinationRootDir=self.getConfigKeyValue(globalConfigJson, 'destinationRootDir')
+            powershellFilepath=self._getConfigKeyValue(globalConfigJson, 'powershellFilepath'),
+            teracopyFilepath=self._getConfigKeyValue(globalConfigJson, 'teracopyFilepath'),
+            rsyncFilepath=self._getConfigKeyValue(globalConfigJson, 'rsyncFilepath'),
+            initScriptName=self._getConfigKeyValue(globalConfigJson, 'initScript'),
+            postScriptName=self._getConfigKeyValue(globalConfigJson, 'postScript'),
+            destinationRootDir=self._getConfigKeyValue(globalConfigJson, 'destinationRootDir')
         )
 
         for ruleJson in rulesConfigJson:
@@ -105,21 +111,21 @@ class PrefbakConfig():
             for ruleFileJson in ruleJson['files']:
                 ruleFilesConfigs.append(
                     PrefbackConfig_Rule_File(
-                        sourcePath=self.getConfigKeyValue(ruleFileJson, 'sourcePath'), 
-                        destinationSubDir=self.getConfigKeyValue(ruleFileJson, 'destinationSubDir'),
-                        operation=self.getConfigKeyValue(ruleFileJson, 'operation')
+                        sourcePath=self._getConfigKeyValue(ruleFileJson, 'sourcePath'), 
+                        destinationSubDir=self._getConfigKeyValue(ruleFileJson, 'destinationSubDir'),
+                        operation=self._getConfigKeyValue(ruleFileJson, 'operation')
                     )
                 )
 
             self.rulesConfig.append(
                 PrefbackConfig_Rule(
-                    name=self.getConfigKeyValue(ruleJson, 'name'), 
-                    initScriptName=self.getConfigKeyValue(ruleJson, 'initScript'), 
-                    postScriptName=self.getConfigKeyValue(ruleJson, 'postScript'), 
+                    name=self._getConfigKeyValue(ruleJson, 'name'), 
+                    initScriptName=self._getConfigKeyValue(ruleJson, 'initScript'), 
+                    postScriptName=self._getConfigKeyValue(ruleJson, 'postScript'), 
                     fileConfigs=ruleFilesConfigs)
             )
     
-    def getConfigKeyValue(self, jsonDict, keyName):
+    def _getConfigKeyValue(self, jsonDict, keyName):
         try:
             return jsonDict[keyName]
         except KeyError:
