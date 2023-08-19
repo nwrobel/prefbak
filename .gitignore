@@ -5,5 +5,3 @@ py-venv-linux
 py-venv-windows
 machine-scripts/*
 machine-config/*
-!machine-config/hostname.config.json
-
