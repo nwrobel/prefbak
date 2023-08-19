@@ -18,6 +18,14 @@
             "program": "main.py",
             "args": ["copper_test.config.json", "--run-all"],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Prefbak: copper.config, --run-all",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "args": ["copper.config.json", "--run-all"],
+            "console": "integratedTerminal"
         }
     ]
 }

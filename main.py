@@ -48,23 +48,29 @@ if __name__ == "__main__":
     # Configure logger
     mypycommons.logger.configureLoggerWithBasicSettings(loggerName=loggerName, logDir=helpers.getProjectLogsDir())
 
-    # Get config
-    configFilepath = mypycommons.file.joinPaths(helpers.getProjectConfigDir(), args.configFilename)
-    app = prefbak.PrefbakApp(configFilepath)
+    try:
+        # Get config
+        configFilepath = mypycommons.file.joinPaths(helpers.getProjectConfigDir(), args.configFilename)
+        app = prefbak.PrefbakApp(configFilepath)
 
-    # ---------------------------
-    # List rules, if arg is set
-    if (args.listRules):
-        for rule in app.config.rulesConfig:
-            print(rule.name)
-        sys.exit(0)
+        # ---------------------------
+        # List rules, if arg is set
+        if (args.listRules):
+            for rule in app.config.rulesConfig:
+                print(rule.name)
+            sys.exit(0)
 
-    if (args.runAllRules):
-        backupRulesToRunConfig = app.config.rulesConfig
-    else:
-        backupRulesToRunConfig = [ruleCfg for ruleCfg in app.config.rulesConfig if (ruleCfg.name in args.runRuleNames)]
-    
-    backupRulesToRunNames = [rule.name for rule in backupRulesToRunConfig]
-    app.run(backupRulesToRunNames)
+        if (args.runAllRules):
+            backupRulesToRunConfig = app.config.rulesConfig
+        else:
+            backupRulesToRunConfig = [ruleCfg for ruleCfg in app.config.rulesConfig if (ruleCfg.name in args.runRuleNames)]
+        
+        backupRulesToRunNames = [rule.name for rule in backupRulesToRunConfig]
+        app.run(backupRulesToRunNames)
 
-    logger.info("All processes complete: prefbak operation finished successfully")
+        logger.info("All processes complete: prefbak operation finished successfully")
+
+    except Exception as ex:
+        logger.exception(ex)
+        logger.error("process ended with errors")
+

@@ -13,21 +13,15 @@ loggerName = 'prefbak-logger'
 logger = mypycommons.logger.getLogger(loggerName)
 
 powershellDefaultFilepath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-teracopyDefaultFilepath = "C:\\Program Files\\TeraCopy\\TeraCopy.exe"
 rsyncDefaultFilepath = 'rsync'
 
 class PrefbackConfig_Global():
-    def __init__(self, destinationRootDir: str, powershellFilepath: str = None, teracopyFilepath: str = None, rsyncFilepath: str = None, initScriptName: str = None, postScriptName: str = None):
+    def __init__(self, destinationRootDir: str, powershellFilepath: str = None, rsyncFilepath: str = None, initScriptName: str = None, postScriptName: str = None):
         # Set defaults if not provided
         if (not powershellFilepath):
             self.powershellFilepath = powershellDefaultFilepath
         else:    
             self.powershellFilepath = powershellFilepath
-
-        if (not teracopyFilepath):
-            self.teracopyFilepath = teracopyDefaultFilepath
-        else:    
-            self.teracopyFilepath = teracopyFilepath
 
         if (not rsyncFilepath):
             self.rsyncFilepath = rsyncDefaultFilepath
@@ -59,24 +53,25 @@ class PrefbackConfig_Rule():
         self.fileConfigs = fileConfigs
 
 class PrefbackConfig_Rule_File():
-    def __init__(self, sourcePath: str, destinationSubDir: str, operation: Literal['rsync', 'tar', 'teracopy']):
+    def __init__(self, sourcePath: str, destinationDir: str, destinationSubDir: str, operation: Literal['rsync', 'tar']):
         if (not sourcePath):
             raise ValueError("Parameter sourcePath is required")
 
-        if (operation != 'rsync' and operation != 'tar' and operation != 'teracopy'):
-            raise ValueError("Parameter operation must be one of: rsync,tar,teracopy")
-
         runningWindows = mypycommons.system.thisMachineIsWindowsOS()
-        if (runningWindows):
-            if (operation == 'tar' or operation == 'rsync'):
-                raise ValueError("only teracopy operation is currently supported on windows")
-        else:
-            if (operation == 'teracopy'):
-                raise ValueError("only rsync/tar operation is supported on linux")            
+        if (not runningWindows):
+            if (not (operation == 'rsync' or operation == 'tar')):
+                raise ValueError("only rsync/tar operation is supported on linux")  
+
+        if (not destinationDir and not destinationSubDir):
+            raise ValueError("either destinationDir or destinationSubDir params are required")
+
+        if (destinationDir and destinationSubDir):
+            raise ValueError("destinationDir and destinationSubDir params cannot be used together")          
         
         self.sourcePath = sourcePath
         self.operation = operation 
-        self.destinationSubDir = destinationSubDir 
+        self.destinationDir = destinationDir
+        self.destinationSubDir = destinationSubDir
 
 class PrefbakConfig():
     def __init__(self, configFilepath):
@@ -98,7 +93,6 @@ class PrefbakConfig():
 
         self.globalConfig = PrefbackConfig_Global(
             powershellFilepath=self._getConfigKeyValue(globalConfigJson, 'powershellFilepath'),
-            teracopyFilepath=self._getConfigKeyValue(globalConfigJson, 'teracopyFilepath'),
             rsyncFilepath=self._getConfigKeyValue(globalConfigJson, 'rsyncFilepath'),
             initScriptName=self._getConfigKeyValue(globalConfigJson, 'initScript'),
             postScriptName=self._getConfigKeyValue(globalConfigJson, 'postScript'),
@@ -112,6 +106,7 @@ class PrefbakConfig():
                 ruleFilesConfigs.append(
                     PrefbackConfig_Rule_File(
                         sourcePath=self._getConfigKeyValue(ruleFileJson, 'sourcePath'), 
+                        destinationDir=self._getConfigKeyValue(ruleFileJson, 'destinationDir'),
                         destinationSubDir=self._getConfigKeyValue(ruleFileJson, 'destinationSubDir'),
                         operation=self._getConfigKeyValue(ruleFileJson, 'operation')
                     )

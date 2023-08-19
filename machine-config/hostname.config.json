@@ -1,7 +1,6 @@
 {
     "global": {
         "powershellFilepath": "",
-        "teracopyFilepath": "",
         "rsyncFilepath": "",
         "initScript": "zinc/init.sh",
         "postScript": "zinc/post.sh",
@@ -34,6 +33,18 @@
                     "sourcePath": "/home/user2/.vim",
                     "destinationSubDir": "user2",
                     "operation": "rsync"
+                }
+            ]
+        },
+        {
+            "name": "dropbox",
+            "initScript": "",
+            "postRunScript": "",
+            "files": [
+                {
+                    "sourcePath": "C:\\Dropbox",
+                    "destinationDir": "Z:\\Test\\dropbox-test",
+                    "operation": "teracopy"
                 }
             ]
         }
