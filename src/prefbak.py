@@ -131,6 +131,8 @@ class PrefbakApp:
         logger.info("Performing robocopy of path '{}' to destination dir: '{}'".format(sourcePath, destinationDir))
 
 # robocopy "D:\Downloads" "Z:\Test" "amdcleanuputility.exe" /COPY:DT
+        # args to reduce verbose logging of files
+        optionalArgs = ['/NFL', '/NDL']
 
         if (mypycommons.file.isFile(sourcePath)):
             sourceFilename = mypycommons.file.getFilename(sourcePath)
@@ -140,6 +142,7 @@ class PrefbakApp:
         else:
             runArgs = ['robocopy', sourcePath, destinationDir, '/mir', '/COPY:DT']
 
+        runArgs += optionalArgs
         subprocess.call(runArgs, shell=True)
 
     def _runFileBackupStep(self, sourcePath: str, fullDestDir: str, operation: Literal['rsync', 'tar']):

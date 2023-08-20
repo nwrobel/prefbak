@@ -3,6 +3,7 @@ __pycache__
 ~logs
 py-venv-linux
 py-venv-windows
+automation
 machine-scripts/*
 machine-config/*
 !machine-config/hostname.config.json
