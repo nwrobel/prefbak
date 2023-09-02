@@ -130,9 +130,6 @@ class PrefbakApp:
     def _robocopyRun(self, sourcePath: str, destinationDir: str):
         logger.info("Performing robocopy of path '{}' to destination dir: '{}'".format(sourcePath, destinationDir))
 
-# robocopy "D:\Downloads" "Z:\Test" "amdcleanuputility.exe" /COPY:DT
-        # args to reduce verbose logging of files
-
         if (mypycommons.file.isFile(sourcePath)):
             sourceFilename = mypycommons.file.getFilename(sourcePath)
             sourceFileDir = sourcePath.replace(sourceFilename, '')
