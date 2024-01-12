@@ -9,9 +9,6 @@ from com.nwrobel.mypycommons import (
 
 from src import helpers
 
-loggerName = 'prefbak-logger'
-logger = mypycommons.logger.getLogger(loggerName)
-
 powershellDefaultFilepath = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
 rsyncDefaultFilepath = 'rsync'
 
@@ -35,7 +32,6 @@ class PrefbackConfig_Global():
             raise ValueError("Parameter destinationRootDir is required")
 
         if (not mypycommons.file.pathExists(destinationRootDir)):
-            logger.info("Backup destination root directory '{}' does not exist: creating it".format(destinationRootDir))
             mypycommons.file.createDirectory(destinationRootDir)
 
         self.destinationRootDir = destinationRootDir
@@ -53,14 +49,9 @@ class PrefbackConfig_Rule():
         self.fileConfigs = fileConfigs
 
 class PrefbackConfig_Rule_File():
-    def __init__(self, sourcePath: str, destinationDir: str, destinationSubDir: str, operation: Literal['rsync', 'tar']):
+    def __init__(self, sourcePath: str, destinationDir: str, destinationSubDir: str):
         if (not sourcePath):
-            raise ValueError("Parameter sourcePath is required")
-
-        runningWindows = mypycommons.system.thisMachineIsWindowsOS()
-        if (not runningWindows):
-            if (not (operation == 'rsync' or operation == 'tar')):
-                raise ValueError("only rsync/tar operation is supported on linux")  
+            raise ValueError("Parameter sourcePath is required") 
 
         if (not destinationDir and not destinationSubDir):
             raise ValueError("either destinationDir or destinationSubDir params are required")
@@ -69,7 +60,6 @@ class PrefbackConfig_Rule_File():
             raise ValueError("destinationDir and destinationSubDir params cannot be used together")          
         
         self.sourcePath = sourcePath
-        self.operation = operation 
         self.destinationDir = destinationDir
         self.destinationSubDir = destinationSubDir
 
@@ -82,7 +72,6 @@ class PrefbakConfig():
         self.globalConfig = None
         self.rulesConfig = []
 
-        logger.info("Loading prefbak config file: {}".format(configFilepath))
         self._loadConfigFile()
 
     def _loadConfigFile(self):
@@ -108,7 +97,6 @@ class PrefbakConfig():
                         sourcePath=self._getConfigKeyValue(ruleFileJson, 'sourcePath'), 
                         destinationDir=self._getConfigKeyValue(ruleFileJson, 'destinationDir'),
                         destinationSubDir=self._getConfigKeyValue(ruleFileJson, 'destinationSubDir'),
-                        operation=self._getConfigKeyValue(ruleFileJson, 'operation')
                     )
                 )
 

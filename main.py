@@ -13,11 +13,7 @@ import com.nwrobel.mypycommons.archive
 
 from src import helpers, config, prefbak
 
-# Setup logging for this entire module/script
-loggerName = 'prefbak-logger'
-logger = mypycommons.logger.getLogger(loggerName)
-
-# ------------------------------------ Script 'main' execution -------------------------------------
+# ---------------------------------- Script 'main' execution -------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
@@ -45,13 +41,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Configure logger
-    mypycommons.logger.configureLoggerWithBasicSettings(loggerName=loggerName, logDir=helpers.getProjectLogsDir())
-
     try:
         # Get config
         configFilepath = mypycommons.file.joinPaths(helpers.getProjectConfigDir(), args.configFilename)
-        app = prefbak.PrefbakApp(configFilepath)
+
+        # Set up logger
+        loggerWrapper = mypycommons.logger.CommonLogger(
+            loggerName="prefbak-logger", 
+            logDir=helpers.getProjectLogsDir(), 
+            logFilename="prefbak.log"
+        )
+        logger = loggerWrapper.getLogger()
+        app = prefbak.PrefbakApp(configFilepath, loggerWrapper)
 
         # ---------------------------
         # List rules, if arg is set

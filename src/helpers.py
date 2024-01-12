@@ -38,11 +38,3 @@ def getProjectConfigDir():
         raise FileNotFoundError("Project config dir machine-config' not found")
     
     return configDir
-
-def getProjectBinDir():
-    binDir = mypycommons.file.joinPaths(getProjectRootDir(), 'bin')
-
-    if (not mypycommons.file.pathExists(binDir)):
-        raise FileNotFoundError("Project bin dir not found")
-    
-    return binDir

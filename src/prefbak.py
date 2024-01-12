@@ -20,36 +20,32 @@ from com.nwrobel.mypycommons import (
 
 from src import helpers, config
 
-# Setup logging for this entire module/script
-loggerName = 'prefbak-logger'
-logger = mypycommons.logger.getLogger(loggerName)
-
-
 class PrefbakApp:
-    def __init__(self, configFilepath):
+    def __init__(self, configFilepath, loggerWrapper: mypycommons.logger.CommonLogger):
         self.config = config.PrefbakConfig(configFilepath)
+        self._logger = loggerWrapper.getLogger()
 
     def run(self, ruleNames: List[str]):
         # ---------------------------
         # Run init script
         if (self.config.globalConfig.initScriptName):
-            logger.info("Running the configured global init script")
+            self._logger.info("Running the configured global init script")
             scriptFilepath = mypycommons.file.joinPaths(helpers.getProjectScriptsDir(), self.config.globalConfig.initScriptName)
             self._runScript(scriptFilepath)
 
         # ----------------------------
         # Perform backup
-        logger.info("Starting routine for the given ({}) configured backup rules: {}".format(str(len(ruleNames)), str(ruleNames)))
+        self._logger.info("Starting routine for the given ({}) configured backup rules: {}".format(str(len(ruleNames)), str(ruleNames)))
 
         for ruleName in ruleNames:
             self._runBackupRule(ruleName)
 
-        logger.info("Backup routine completed successfully")
+        self._logger.info("Backup routine completed successfully")
 
         # ---------------------------
         # Run postrun script
         if (self.config.globalConfig.postScriptName):
-            logger.info("Running the configured global post script")
+            self._logger.info("Running the configured global post script")
             scriptFilepath = mypycommons.file.joinPaths(helpers.getProjectScriptsDir(), self.config.globalConfig.postScriptName)
             self._runScript(scriptFilepath)
 
@@ -64,10 +60,10 @@ class PrefbakApp:
         '''
         '''
         ruleConfig = self._getBackupRule(ruleName)
-        logger.info("=====>Beginning Rule: {}".format(ruleConfig.name))
+        self._logger.info("=====>Beginning Rule: {}".format(ruleConfig.name))
 
         if (ruleConfig.initScriptName):
-            logger.info("Running the rule's configured init script")
+            self._logger.info("Running the rule's configured init script")
             scriptFilepath = mypycommons.file.joinPaths(helpers.getProjectScriptsDir(), ruleConfig.initScriptName)
             self._runScript(scriptFilepath)
 
@@ -84,16 +80,11 @@ class PrefbakApp:
             if (not mypycommons.file.pathExists(fullDestDir)):
                 mypycommons.file.createDirectory(fullDestDir)
 
-            logger.info("Starting file backup: '{}' to dir --> '{}'".format(ruleFileConfig.sourcePath, fullDestDir))
-            self._runFileBackupStep(ruleFileConfig.sourcePath, fullDestDir, ruleFileConfig.operation)
-
-            # On Linux only:
-            # Set the permissions on the destination path and the archive file within so that the user can read the backup
-            # if (not runningWindowsOS):
-            #     changeDestinationDirectoryPermissions(destinationDir, backupDataPermissions)
+            self._logger.info("Starting file backup: '{}' to dir --> '{}'".format(ruleFileConfig.sourcePath, fullDestDir))
+            self._runFileBackupStep(ruleFileConfig.sourcePath, fullDestDir)
 
         if (ruleConfig.postScriptName):
-            logger.info("Running the rule's configured post script")
+            self._logger.info("Running the rule's configured post script")
             scriptFilepath = mypycommons.file.joinPaths(helpers.getProjectScriptsDir(), ruleConfig.postScriptName)
             self._runScript(scriptFilepath)
 
@@ -107,28 +98,32 @@ class PrefbakApp:
         else:
             runArgs = [scriptFilepath]
 
-        logger.info("Starting script: '{}'".format(scriptFilepath))
+        self._logger.info("Starting script: '{}'".format(scriptFilepath))
         subprocess.call(runArgs, shell=True)
-        logger.info("Script execution complete")
+        self._logger.info("Script execution complete")
+
+    def _runFileBackupStep(self, sourcePath: str, fullDestDir: str):
+        '''
+        '''
+        runningWindows = mypycommons.system.thisMachineIsWindowsOS()
+        if (runningWindows):
+            self._robocopyRun(sourcePath, fullDestDir)        
+        else:
+            self._rsyncRun(sourcePath, fullDestDir)
 
     def _rsyncRun(self, sourcePath: str, destinationDir: str):
-        logger.info("Performing rsync of path '{}' to destination dir: '{}'".format(sourcePath, destinationDir))
+        self._logger.info("Performing rsync of path '{}' to destination dir: '{}'".format(sourcePath, destinationDir))
+
+        # If source path is directory, we want to copy the contents of that dir (not the dir itself)
+        # so we add a trailing / to the dir name
+        if (mypycommons.file.isDirectory(sourcePath) and sourcePath[-1] != '/'):
+            sourcePath += '/'
 
         runArgs = [self.config.globalConfig.rsyncFilepath, '-aP', '--delete-after', sourcePath, destinationDir]
-        subprocess.call(runArgs, shell=True)
-
-    def _tarRun(sourcePath: str, destinationDir: str):
-        currentTimestampStr = mypycommons.time.getCurrentTimestampForFilename()
-        baseArchiveFilename = mypycommons.file.getFilename(sourcePath)
-
-        tarArchiveName = '{} {}.tar'.format(currentTimestampStr, baseArchiveFilename) 
-        tarArchiveFilepath = mypycommons.file.joinPaths(destinationDir, tarArchiveName)
-
-        logger.info("Creating TAR archive: '{}'".format(tarArchiveFilepath))
-        mypycommons.archive.createTarArchive(sourcePath, tarArchiveFilepath)
+        subprocess.call(runArgs)
 
     def _robocopyRun(self, sourcePath: str, destinationDir: str):
-        logger.info("Performing robocopy of path '{}' to destination dir: '{}'".format(sourcePath, destinationDir))
+        self._logger.info("Performing robocopy of path '{}' to destination dir: '{}'".format(sourcePath, destinationDir))
 
         if (mypycommons.file.isFile(sourcePath)):
             sourceFilename = mypycommons.file.getFilename(sourcePath)
@@ -139,25 +134,7 @@ class PrefbakApp:
             runArgs = ['robocopy', sourcePath, destinationDir, '/mir', '/COPY:DT', '/NFL', '/NDL', '/r:0', '/w:0']
 
         subprocess.call(runArgs, shell=True)
-
-    def _runFileBackupStep(self, sourcePath: str, fullDestDir: str, operation: Literal['rsync', 'tar']):
-        '''
-        '''
-        if (operation == 'tar'):
-            self._tarRun(sourcePath, fullDestDir)
-
-        elif (operation == 'rsync'):
-            self._rsyncRun(sourcePath, fullDestDir)
-
-        else:
-            self._robocopyRun(sourcePath, fullDestDir)
-
-
-# # def changeDestinationDirectoryPermissions(destinationPath, backupDataPermissionsData):
-# #     logger.info("Updating file permissions for backup destination directory {}".format(destinationPath))
-# #     mypycommons.file.applyPermissionToPath(path=destinationPath, owner=backupDataPermissionsData['owner'], group=backupDataPermissionsData['group'], mask=backupDataPermissionsData['mask'], recursive=True)
-
-
+            
 
 
 
