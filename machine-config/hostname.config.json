@@ -10,12 +10,11 @@
         {
             "name": "bashrc",
             "initScript": "",
-            "postScript": "",
+            "postRunScript": "",
             "files": [
                 {
                     "sourcePath": "/home/user/.bashrc",
-                    "destinationSubDir": "",
-                    "operation": "rsync | tar"
+                    "destinationSubDir": "bashrc"
                 }
             ]
         },
@@ -26,25 +25,22 @@
             "files": [
                 {
                     "sourcePath": "/home/user/.vim",
-                    "destinationSubDir": "user",
-                    "operation": "rsync"
+                    "destinationSubDir": "vim/vim-user-1"
                 },
                                 {
                     "sourcePath": "/home/user2/.vim",
-                    "destinationSubDir": "user2",
-                    "operation": "rsync"
+                    "destinationSubDir": "vim/vim-user-2"
                 }
             ]
         },
         {
-            "name": "dropbox",
+            "name": "sql",
             "initScript": "",
-            "postRunScript": "",
+            "postScript": "",
             "files": [
                 {
-                    "sourcePath": "C:\\Dropbox",
-                    "destinationDir": "Z:\\Test\\dropbox-test",
-                    "operation": "teracopy"
+                    "sourcePath": "/var/data/sql.db",
+                    "destinationDir": "/db_backups/sql"
                 }
             ]
         }
